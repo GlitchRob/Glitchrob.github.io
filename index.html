@@ -22,51 +22,57 @@
     }
     /* Botón flotante para información general */
     .general-info-btn {
-      position: fixed;
-      bottom: 80px;
-      right: 20px;
-      background: #00796b;
-      color: #fff;
-      width: 56px;
-      height: 56px;
-      border-radius: 50%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      font-size: 36px;
-      cursor: pointer;
-      z-index: 20;
-    }
-    /* Botón de configuración (switch) */
-    #configToggleBtn {
-    transform: rotate(0deg);
-      position: fixed;
-      bottom: 8px;
-      left: 20px;
-      background: rgba(0,0,0,0.6);
-      color: #fff;
-      border: none;
-      padding: 8px 11px;
-      border-radius: 4px;
-      cursor: pointer;
-      z-index: 50;
-      font-size: 18px;
-    }
+  position: fixed;
+  top: 80px;
+  left: 20px;
+  background: #00796b;
+  color: #fff;
+  width: 40px;
+  height: 40px;
+  border-radius: 60% 40% 40% 60% / 60% 60% 40% 40%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 30px;
+  cursor: pointer;
+  z-index: 20;
+  transform: rotate(0deg);
+}
+/* Botón de configuración (switch) */
+#configToggleBtn {
+  position: fixed;
+  display: flex;
+  top: 130px;
+  left: 20px;
+  background: rgba(0,0,0,0.8);
+  color: #fff;
+  border: 1px solid gray;
+  padding: 5px 10px;
+  border-radius: 12px 12px 12px 0;
+  cursor: pointer;
+  z-index: 20;
+  font-size: 12px;
+  font-weight: 500;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  max-width: 200px;
+  line-height: 1.4;
+}
     .modal {
       display:none; 
       position:fixed; 
       top:0; left:0; right:0; bottom:0;
-      background:rgba(0,0,0,0.5); 
+      background: rgba(0,0,0,0.5);
       justify-content:center; 
       align-items:center; 
       z-index:30;
     }
     .modal-content {
       box-shadow:0 2px 4px rgba(9,2,0,4.1);
-      background:black; 
+      background: rgba(0,0,0,0.5); 
       color:white; 
       padding:20px; 
-      border-radius:4px; 
+      border-radius:10px;
+      border: 1px solid grey;
       width:65%; 
       max-width:500px; 
       position:relative;
@@ -92,13 +98,16 @@
       margin-right:5px;
     }
     .group-header {
+    background: rgba(0,0,0,0.5);
+    margin-right:0px;
       margin-bottom:20px;
       color: white;
-      padding:10px; 
-      margin-bottom:5px; 
-      border-radius:4px;
+      padding-bottom:10px;
+      padding-right:10px;
+      border-radius:20px;
       cursor: pointer;
       position: relative;
+      padding-top:20px;
     }
     .info-btn {
       position: absolute;
@@ -134,15 +143,20 @@
     }
     /* Botón para agregar cuenta */
     #addAccountBtn {
-      margin: 15px;
-      background: #009688;
-      color: white;
-      border: none;
-      padding: 10px 15px;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    /* Contenedor de la gráfica */
+  margin: px;
+  background: #009688;
+  color: white;
+  border: none;
+  padding: 18px;
+  border-radius: 50px;
+  cursor: pointer;
+  position: fixed;
+  bottom: 84px;
+  right: 20px;
+  z-index: 20;
+  display: flex;
+}
+/* Contenedor de la gráfica */
     #chartContainer {color: white;
       width: 350px;
       height: 350px;
@@ -152,11 +166,56 @@
     b { color:green; }
     c { color:red; }
     totales { display:inline-block; width:120px; height:15px; }
+
+#periodListModal {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.8);
+    align-items: center; justify-content: center;
+    z-index: 1000;
+  }
+  #periodListModal .modal-content {
+    background: #fff; color: #000;
+    max-height: 80%; overflow-y: auto;
+    padding: 20px; border-radius: 8px;
+    width: 90%; max-width: 500px;
+  }
+  #periodListModal h2 { margin-top: 0; }
+  #periodListModal ul { list-style: none; padding: 0; }
+  #periodListModal li { margin-bottom: 8px; }
+  #periodListModal button { margin-top: 10px; }
+  
+  #floatingDates {
+    display: inline-block;
+    margin: ;
+    width: 100%;
+    height:;
+    display: flex;
+    padding: 5px;
+  position: fixed;
+  top: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.9);
+  padding: 6px 12px;
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  font-size: 12px;
+  font-weight: bold;
+  color: grey;
+  text-align: center;
+  z-index: 999;
+}
+  
   </style>
 </head>
 <body>
   <!-- Botón de configuración -->
   <button id="configToggleBtn"></button>
+  
+   <!-- Botón para agregar cuenta -->
+  <button id="addAccountBtn" class="material-icons">add_card</button>
   
   <!-- Contenedor de la gráfica circular -->
   <div id="chartContainer">
@@ -164,17 +223,17 @@
   </div>
   
   <!-- Encabezado global con fecha actual y fecha de último pago -->
-  <h1 style="color:white;margin:15px;">
-    Transacciones<br>
-    <small style="font-size:14px;font-weight:bold; color:grey;">
-      Fecha Actual: <span id="currentDate"></span>
-    </small><br>
-    <small style="font-size:14px;font-weight:bold; color:grey;">
-      Último Pago: <span id="lastPaymentDate"></span>
-    </small>
-  </h1>
-  <!-- Botón para agregar cuenta -->
-  <button id="addAccountBtn">Nueva Cuenta</button>
+  <h1 style="color:white;margin:15px; font-size:20px;">
+    Cuentas
+   <div id="floatingDates" style="display: flex; justify-content: space-between; flex-wrap: wrap; width: 100%;">
+  <small style="padding-left:5px;">
+    Fecha Actual: <span id="currentDate"></span>
+  </small>
+  <small style="padding-right:5px;">
+    Último Pago: <span id="lastPaymentDate"></span>
+  </small>
+</div>
+</h1>
   
   <!-- Total general fijo -->
   <div id="globalTotals">
@@ -251,7 +310,6 @@
   <div class="modal" id="accountInfoModal">
     <div class="modal-content">
       <span class="close-modal" id="closeAccountInfoModal">&times;</span>
-      <h2>Información de la Cuenta</h2>
       <div id="accountInfoContent"></div>
     </div>
   </div>
@@ -293,17 +351,15 @@
   </div>
   
 <script>
-  // CONFIGURACIÓN: se utiliza localStorage para guardar el modo: "weekly" o "biweekly"
   let useFortnights = localStorage.getItem('calcMode') === 'biweekly';
 
-  // Actualiza el texto del botón de configuración según el modo actual
-  function updateConfigButtonText() {
-    const btn = document.getElementById('configToggleBtn');
-    btn.innerText = useFortnights ? "👁️‍🗨️ Se muetran los pagos: Quincenales" : "👁️‍🗨️ Se muestran los pagos: Semanales";
-  }
-  updateConfigButtonText();
+function updateConfigButtonText() {
+  const btn = document.getElementById('configToggleBtn');
+  btn.innerHTML = `<span class="material-icons" style="vertical-align: middle; margin-right: 0px;">pivot_table_chart</span> ${useFortnights ? "" : ""}`;
+}
 
-  // Escucha el clic para cambiar el modo de cálculo y lo guarda en localStorage
+updateConfigButtonText();
+
   document.getElementById('configToggleBtn').addEventListener('click', () => {
     useFortnights = !useFortnights;
     localStorage.setItem('calcMode', useFortnights ? 'biweekly' : 'weekly');
@@ -318,15 +374,11 @@
   let selectedTransactionIndex = null;
   let isEditingTransaction = false;
 
-  // --- Helpers de fechas ---
-
-  // Convierte una cadena "yyyy-mm-dd" a objeto Date
   function parseLocalDate(dateStr) {
     const [yyyy, mm, dd] = dateStr.split("-");
     return new Date(+yyyy, +mm - 1, +dd);
   }
 
-  // Formatea una fecha para los inputs de tipo date (yyyy-mm-dd)
   function formatDateForInput(date) {
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -334,21 +386,15 @@
     return `${y}-${m}-${d}`;
   }
 
-  // Formatea la fecha en el formato "Domingo, 13/abril/2025"
   function formatFullDate(date) {
-    // Obtiene el nombre del día en formato largo (por ejemplo, "domingo")
     let diaSemana = date.toLocaleDateString("es-MX", { weekday: "long" });
-    // Capitaliza la primera letra
     diaSemana = diaSemana.charAt(0).toUpperCase() + diaSemana.slice(1);
-    // Obtiene el día con dos dígitos
     const dia = date.toLocaleDateString("es-MX", { day: "2-digit" });
-    // Obtiene el nombre completo del mes y lo pasa a minúsculas
     const mes = date.toLocaleDateString("es-MX", { month: "long" }).toLowerCase();
     const anio = date.getFullYear();
-    return `${diaSemana}, ${dia}/${mes}/${anio}`;
+    return `${diaSemana}, ${dia} de ${mes} de ${anio}`;
   }
 
-  // Modo semanal: obtiene el viernes actual
   function getCurrentFriday() {
     const today = new Date();
     const diff = (5 - today.getDay() + 7) % 7;
@@ -357,7 +403,6 @@
     return friday;
   }
 
-  // Modo quincenal: obtiene el límite de la quincena actual
   function getCurrentFortnightLimit(date) {
     let d = date.getDate();
     let month = date.getMonth();
@@ -369,7 +414,30 @@
     }
   }
 
-  // Retorna la cantidad de quincenas entre dos fechas
+function computePreviousMonthBalance(accountIndex) {
+  const today = new Date();
+  const prevMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
+  const prevMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+
+  let balance = 0;
+  const account = accounts[accountIndex];
+
+  transactions.forEach(tr => {
+    if (tr.accountIndex !== accountIndex) return;
+    const eff = computeEffectivePaymentDate(tr, account);
+    if (eff >= prevMonthStart && eff <= prevMonthEnd) {
+      const amount = tr.type === 'Gasto'
+        ? (tr.installmentOffset !== undefined
+            ? tr.total
+            : (tr.months > 1 ? tr.total / tr.months : tr.total))
+        : tr.total;
+      balance += tr.type === 'Gasto' ? amount : -amount;
+    }
+  });
+
+  return balance;
+}   
+
   function countFortnights(start, end) {
     let count = 0;
     let current = new Date(start);
@@ -380,7 +448,6 @@
     return count;
   }
 
-  // Retorna la siguiente fecha límite de quincena (del 1 al 15 o 16 al último día)
   function nextFortnightBoundary(date) {
     let current = new Date(date);
     if (current.getDate() < 16) {
@@ -390,7 +457,6 @@
     }
   }
 
-  // Función original para contar viernes
   function countFridays(start, end) {
     let count = 0;
     let current = new Date(start);
@@ -401,7 +467,6 @@
     return count;
   }
 
-  // --- Cálculo de fecha de pago efectivo ---
   function getEffectivePaymentDate(creationStr, cutoffStr, paymentStr) {
     const creation = parseLocalDate(creationStr);
     const cutoffRef = parseLocalDate(cutoffStr);
@@ -419,7 +484,6 @@
       }
     } else {
       if (creation <= cycleCutoff) {
-        // mismo mes
       } else {
         month += 1;
       }
@@ -431,7 +495,6 @@
     return new Date(year, month, paymentDay);
   }
 
-  // Para cuotas
   function computeEffectivePaymentDate(transaction, account) {
     let base = getEffectivePaymentDate(
       transaction.creationDate,
@@ -446,7 +509,6 @@
     return base;
   }
 
-  // --- LocalStorage y manejo de cuentas ---
   function loadAccounts() {
     const stored = localStorage.getItem('cuentas');
     accounts = stored ? JSON.parse(stored) : [];
@@ -478,7 +540,6 @@
     }
   }
 
-  // --- LocalStorage y manejo de transacciones ---
   function loadTransactions() {
     const stored = localStorage.getItem('transacciones');
     transactions = stored ? JSON.parse(stored) : [];
@@ -490,8 +551,7 @@
   function saveTransactions() {
     localStorage.setItem('transacciones', JSON.stringify(transactions));
   }
-
-  // Actualiza el encabezado principal con el último pago (entre todas las transacciones)
+  
   function updateLastPaymentHeader() {
     let lastPayment = null;
     transactions.forEach(tr => {
@@ -506,7 +566,6 @@
     document.getElementById('lastPaymentDate').innerText = lastPayment ? formatFullDate(lastPayment) : '-';
   }
 
-  // --- Renderizar transacciones ---
   function renderTransactions() {
     let filteredTransactions = selectedAccountFilters.length > 0
       ? transactions.filter(tr => selectedAccountFilters.includes(tr.accountIndex))
@@ -542,17 +601,34 @@
       if (!account) continue;
 
       const todayStr = formatDateForInput(today);
-      // Se obtiene la fecha de pago efectiva para agrupar
-      const currentPaymentDate = getEffectivePaymentDate(todayStr, account.cutoffDate, account.paymentDate);
-      const currentPaymentStr = formatFullDate(currentPaymentDate);
-      const diffTime = currentPaymentDate - today;
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      // Calcula la cantidad de períodos entre hoy y la fecha de pago
+const currentPaymentDate = getEffectivePaymentDate(todayStr, account.cutoffDate, account.paymentDate);
+
+const prevBalance = computePreviousMonthBalance(parseInt(accountIndex), currentPaymentDate);
+
+const currBalance = computeCurrentMonthBalance(parseInt(accountIndex), currentPaymentDate);
+
+const showPrev = prevBalance > 0;
+const balanceLabel = showPrev ? 'Saldo mes anterior' : 'Saldo mes actual';
+const displayBalance = showPrev ? prevBalance : currBalance;
+const displayStr = `$${Number(displayBalance)
+  .toLocaleString("es-MX",{minimumFractionDigits:0,maximumFractionDigits:2})}`;
+const statusText = displayBalance <= 0 ? 'Pagado' : 'Pendiente';
+const payDay = parseLocalDate(account.paymentDate).getDate();
+const prevPaymentDate = new Date(
+  currentPaymentDate.getFullYear(), 
+  currentPaymentDate.getMonth() - 1, 
+  payDay
+);
+
+const diffPrevTime = prevPaymentDate - today;
+const diffPrevDays = Math.ceil(diffPrevTime / (1000 * 60 * 60 * 24));
+
+const prevPaymentDateStr = prevPaymentDate
+  ? formatFullDate(prevPaymentDate)
+  : '-';
+
       const periodCount = useFortnights ? countFortnights(today, currentPaymentDate) : countFridays(today, currentPaymentDate);
 
-      // Para el LÍMITE DE PAGO se utiliza:
-      // - Modo Semanal: el viernes actual
-      // - Modo Quincenal: el límite de la quincena actual
       const limitOfPayment = useFortnights ? getCurrentFortnightLimit(today) : getCurrentFriday();
 
       let groupTransactions = group.transactions.filter(tr => {
@@ -600,41 +676,87 @@
       });
       let lastPaymentForAccountStr = lastPaymentForAccount ? formatFullDate(lastPaymentForAccount) : '-';
 
-      // Crea un contenedor para la cuenta, asignándole la clase "account-group" para facilitar la gestión
       let header = document.createElement('div');
       header.className = 'group-header';
       header.style.background = account.color 
         ? `linear-gradient(to left, ${account.color}, black)` 
         : 'linear-gradient(to left, #7B5DFF, black)';
-      header.innerHTML = `
-        <strong style="font-size: 25px;">${account.name}</strong><br>
-        
-        <small style="font-size:12px; color:white;"><strong>Fecha de pago:</strong> ${currentPaymentStr} en ${diffDays} día(s)</small>
-        <span class="material-icons info-btn" title="Ver información">info</span><br>
-        <span style="margin-top:-15px;padding:5px;" class="amount">Deuda Actual:<br>
-          <span style="margin-top:5px;padding:2px;background: rgba(0,0,0,0.5);color:red;font-size:20px;">
-            $${Number(dailyTotal).toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-          </span><br>
-          <small style="font-size:12px; color:white;"><strong>Último pago:</strong> ${lastPaymentForAccountStr}</small>
-        </span><br>
-        <span style="margin-top:-60px;" class="amount1">A pagar por ${useFortnights ? "quincena" : "viernes"}: ${dailyPeriodTotal <= 0 ? "<b>Pagado</b>" : "<c>Pendiente</c>"}<br> 
-          <span style="font-size:25px;color:green;font-weight:bold;">
-            $${Number(dailyPeriodTotal).toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-          </span> (${useFortnights ? `${periodCount} quincenas` : `${periodCount} viernes`})<br>
-          <small style="font-weight: bold; color: grey;">Límite de pago: ${formatFullDate(limitOfPayment)}</small><br>
-        </span><br>
-        <span style="margin-top:-15px;margin-right:-10px;font-size:20px" class="amount">
-          Saldo: <span style="font-size:20px;background: black;padding:10px;border-radius:4px; margin-bottom: -40px;">
-            $${Number(generalTotal).toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-          </span>
-        </span>
-      `;
+
+const prevBalanceStr = `$${Number(prevBalance)
+  .toLocaleString("es-MX",{minimumFractionDigits:0, maximumFractionDigits:2})}`;
+      const currentPaymentStr = formatFullDate(currentPaymentDate);
+      const diffTime = currentPaymentDate - today;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+
+function computeCurrentMonthBalance(accountIndex, refDate) {
+  const year  = refDate.getFullYear();
+  const month = refDate.getMonth();
+  const start = new Date(year, month-1);
+  const end   = new Date(year, month);
+  let balance = 0;
+  const account = accounts[accountIndex];
+
+  transactions.forEach(tr => {
+    if (tr.accountIndex !== accountIndex) return;
+    const eff = computeEffectivePaymentDate(tr, account);
+    if (eff >= start && eff <= end) {
+      const amt = tr.type === 'Gasto'
+        ? (tr.installmentOffset !== undefined
+            ? tr.total
+            : (tr.months > 1 ? tr.total/tr.months : tr.total))
+        : tr.total;
+      balance += tr.type === 'Gasto' ? amt : -amt;
+    }
+  });
+
+  return balance;
+}
+header.innerHTML = `
+  <strong style="font-size: 20px;"><i class="material-icons">credit_card</i> <span style="top:-40px;">${account.name}</span></strong><br>
+  <small style="font-size:12px; color:white;">
+    <strong>Pago:</strong> ${currentPaymentStr} en ${diffDays} día(s) (${useFortnights ? `${periodCount} quincenas` : `${periodCount} viernes`})
+  </small><br>
+
+  <span class="" style="">
+    
+    <small style="font-weight:bold;font-size:12px;padding-top:2px;">Deuda Actual:</small>
+    <span style="color:red;font-size:18px;">
+      $${Number(showPrev ? prevBalance : dailyTotal)
+        .toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+    </span>
+  </span><br><br>
+  <span class="amount1" style="margin-top:-60px;">
+    <small style="font-weight:bold; color:grey;">Pago: ${formatFullDate(limitOfPayment)}</small><br>
+    <span style="font-size:25px; color:green; font-weight:bold;">
+      $${Number(dailyPeriodTotal).toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+    </span> ${useFortnights ? "quincenal" : "semanal"}<br>
+
+    <span style="font-size:12px; font-weight:bold; padding-right:30px;padding-top:6px;" class="info-btn">${balanceLabel}: ${displayStr} <span style="border-radius:5px; background: white; padding:0.5px; font-size:12px; color:${statusText === 'Pagado' ? 'green' : 'red'}; font-weight:bold;">
+  ${statusText}
+</span>
+    <br>
+    ${prevPaymentDateStr} <small style="font-size:12px; color:white;">
+  <strong>en:</strong> ${diffPrevDays} día(s)
+</small><br>
+    </span><span class="material-icons info-btn" title="Ver información">info</span><br>
+    <small style="font-size:12px; color:white; right:20px; padding-right:20px;">
+      <strong>Último pago:</strong> ${lastPaymentForAccountStr}
+    </small>
+  </span>
+
+  <span class="amount" style="margin-top:-15px; margin-right:-10px; font-size:20px;">
+    <small style="font-weight:bold; font-size:12px;">Saldo:</small>
+    <span style="font-size:20px; background:black; padding:10px 25px 10px 15px; border-radius:0;">
+      $${Number(generalTotal)
+        .toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+    </span>
+  </span>
+`;
 
       header.addEventListener('click', (e) => {
         if (e.target.classList.contains('info-btn')) return;
-        // Oculta todas las secciones de cuenta
         document.querySelectorAll('.account-group').forEach(div => div.style.display = 'none');
-        // Alterna la sección de esta cuenta
         groupDiv.style.display = groupDiv.style.display === 'none' ? 'block' : 'none';
       });
       container.appendChild(header);
@@ -644,7 +766,6 @@
         showAccountInfo(parseInt(accountIndex), group.transactions, generalTotal);
       });
 
-      // Se crea el contenedor (div) para mostrar las transacciones de la cuenta y se le asigna la clase "account-group"
       let groupDiv = document.createElement('div');
       groupDiv.className = 'account-group';
       groupDiv.style.display = 'none';
@@ -657,7 +778,7 @@
           card.innerHTML = `
             <div style="background: linear-gradient(to right, #4c4c4c, black); color: white; padding: 10px; margin: -10px;">
               <small class="amount" style="margin-bottom: -15px;">${account.name}</small>
-              <strong>${tr.description}</strong><br>
+              <strong><i style"font-size:10px;" class="material-icons">attach_money</i> ${tr.description}</strong><br>
               <small style="font-weight: bold; font-size: 12px;color: gray;">
                 ${formatFullDate(parseLocalDate(tr.creationDate))}
               </small><br>
@@ -670,7 +791,7 @@
           card.innerHTML = `
             <div style="background: linear-gradient(to right, #4C4C4C, black); color: white; padding: 10px; margin: -10px;">
               <small class="amount" style="margin-bottom: -15px;">${account.name}</small>
-              <strong>${tr.description}</strong>
+              <strong><i class="material-icons">payments</i> ${tr.description}</strong>
               <small style="border-radius:27px;color:#f44336;font-weight:bold;">
                 ${tr.installmentOffset !== undefined ? `(${tr.installmentOffset + 1} / ${tr.totalMonths})` : ''}
               </small>
@@ -694,13 +815,13 @@
     }
     const globalDiv = document.getElementById('globalTotals');
     globalDiv.innerHTML = `
-      <totales>Total Mensual:<br> <span style="color:red;font-size:20px;">$${Number(globalDailyTotal).toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span></totales>
-      <totales>Total por Periodo:<br> <span style="color:green;font-size:20px;">$${Number(globalDailyPeriodTotal).toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span></totales>
-      <totales>Deuda Total:<br> <span style="font-size:20px;">$${Number(globalGeneralTotal).toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span></totales>
+      <totales id=""><strong>Total Mensual</strong><br> <span style="color:red;font-size:16px;">$${Number(globalDailyTotal).toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span></totales>
+<totales id="totalPeriodBtn">
+      <strong>Total ${useFortnights ? "Quincenal" : "Semanal"}</strong><br> <span style="color:green;font-size:16px;">$${Number(globalDailyPeriodTotal).toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} <i class="material-icons" style="text-decoration:none; font-size:14px;">info</i></span></totales>
+      <totales><strong>Deuda Total</strong><br> <span style="font-size:16px;">$${Number(globalGeneralTotal).toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span></totales>
     `;
   }
 
-  // Función para mostrar información de cuenta en un modal
   function showAccountInfo(accountIndex, accountTransactions, accountTotal) {
     const account = accounts[accountIndex];
     const today = new Date();
@@ -731,16 +852,15 @@
       monthlyHtml = 'No hay transacciones programadas para meses futuros.';
     }
     let html = `
-      <p><strong>Cuenta:</strong> ${account.name}</p>
-      <p><strong>Saldo Actual:</strong> $${Number(accountTotal).toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
-      <p><strong>Totales Mensuales (próximos meses):</strong><br>${monthlyHtml}</p>
-      <p><strong>Fecha de Fin (Último Pago):</strong> ${lastPaymentDate ? formatFullDate(lastPaymentDate) : '-'}</p>
+      <p><h1>${account.name}</p></h1>
+      <p><strong>Saldo:</strong> $${Number(accountTotal).toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
+      <p><strong>Próximos meses:</strong><br>${monthlyHtml}</p>
+      <p><strong>Fecha de Último Pago:</strong> ${lastPaymentDate ? formatFullDate(lastPaymentDate) : '-'}</p>
     `;
     document.getElementById('accountInfoContent').innerHTML = html;
     document.getElementById('accountInfoModal').style.display = 'flex';
   }
 
-  // Función para mostrar información general en un modal
   function showGeneralInfo() {
     const today = new Date();
     let monthlyTotals = {};
@@ -785,7 +905,6 @@
     document.getElementById('generalInfoModal').style.display = 'flex';
   }
 
-  // --- Actualizar gráfica de cuentas ---
   let accountsChart;
   function updateAccountsChart() {
     const ctx = document.getElementById('accountsChart').getContext('2d');
@@ -829,7 +948,6 @@
     });
   }
 
-  // --- Detalles de transacción ---
   function showTransactionDetails(tr) {
     let acc = accounts[tr.accountIndex];
     let html = `
@@ -922,7 +1040,6 @@
     };
   }
 
-  // --- Cerrar modales ---
   document.getElementById('closeTransactionModal').onclick = () => {
     document.getElementById('transactionModal').style.display = 'none';
   };
@@ -944,7 +1061,6 @@
     });
   });
 
-  // --- CREAR/EDITAR TRANSACCIONES ---
   document.getElementById('transactionForm').addEventListener('submit', (e) => {
     e.preventDefault();
     let creationDate = document.getElementById('transCreationDate').value;
@@ -988,7 +1104,6 @@
     selectedTransactionIndex = null;
   });
 
-  // --- Crear cuenta (Modal de cuenta) ---
   document.getElementById('accountForm').addEventListener('submit', (e) => {
     e.preventDefault();
     const name = document.getElementById('accountName').value;
@@ -1007,13 +1122,11 @@
     }
   });
 
-  // Botón para agregar cuenta
   document.getElementById('addAccountBtn').addEventListener('click', () => {
     document.getElementById('accountForm').reset();
     document.getElementById('accountModal').style.display = 'flex';
   });
 
-  // Botón flotante para nueva transacción
   document.getElementById('addTransactionBtn').addEventListener('click', () => {
     isEditingTransaction = false;
     selectedTransactionIndex = null;
@@ -1027,10 +1140,7 @@
     document.getElementById('transactionModal').style.display = 'flex';
   });
 
-  // Botón flotante para información general
   document.getElementById('generalInfoBtn').addEventListener('click', () => { showGeneralInfo(); });
-
-  // Mostrar/ocultar campos según tipo de transacción
   document.getElementById('transType').addEventListener('change', (e) => {
     if (e.target.value === 'Ingreso') {
       document.getElementById('gastoFields').style.display = 'block';
@@ -1045,40 +1155,39 @@
     }
   });
 
-  // --- NOTIFICACIÓN DE PAGO SEMANAL MODIFICADA ---
-  // Esta función se ejecuta al cargar y chequea si faltan 3 días o menos para el pago (viernes actual) en modo semanal.
-  // Recorre todas las cuentas existentes y solo considera aquellas cuyo pago del viernes sea mayor a 0.
+  window.onload = function () {
+    document.getElementById('currentDate').innerText = formatFullDate(new Date());
+    loadAccounts();
+    loadTransactions();
+  };
+
   function checkWeeklyPaymentNotification() {
     if (useFortnights) return; // Solo para modo semanal
     const today = new Date();
     const friday = getCurrentFriday();
     const diffDays = Math.ceil((friday - today) / (1000 * 60 * 60 * 24));
     
-    if (diffDays <= 3) {
+    if (diffDays <= 5) {
       let pendingAccounts = [];
       // Se recorre cada cuenta para verificar su pago del viernes
       accounts.forEach((account, index) => {
         const paymentAmount = calculateWeeklyPayment(index);
-        if (paymentAmount > 0) { // Se ignoran aquellas cuentas con pago 0
+        if (paymentAmount > 0) {
           pendingAccounts.push({ accountIndex: index, amount: paymentAmount });
         }
       });
       
-      if (pendingAccounts.length > 0) {
-        // Se muestra un modal único listando todas las cuentas con pago pendiente
-        showPaymentNotificationModal(pendingAccounts);
+      if (pendingAccounts.length > 0) {        showPaymentNotificationModal(pendingAccounts);
       }
     }
   }
 
-  // Función que calcula el monto total pendiente para el pago semanal (viernes) para la cuenta indicada
   function calculateWeeklyPayment(accountIndex) {
     let total = 0;
     const account = accounts[accountIndex];
     transactions.forEach(tr => {
       if (tr.accountIndex == accountIndex && tr.type === 'Gasto') {
         const eff = computeEffectivePaymentDate(tr, account);
-        // Se revisa que la fecha efectiva del gasto corresponda exactamente al viernes actual
         if (eff.toDateString() === getCurrentFriday().toDateString()) {
           total += (tr.installmentOffset !== undefined 
                      ? tr.total 
@@ -1089,91 +1198,12 @@
     return total;
   }
 
-  // Modal de notificación que muestra un listado con todas las cuentas y sus montos pendientes
-  function showPaymentNotificationModal(pendingAccounts) {
-    let modal = document.getElementById('paymentNotificationModal');
-    let modalContentHtml = `
-      <h2>Pagos Semanales Pendientes</h2>
-      <p>Falta 1 día o menos para el pago semanal (viernes actual).</p>
-      <ul style="list-style: none; padding: 0;">`;
-    
-    pendingAccounts.forEach(pa => {
-      modalContentHtml += `
-        <li style="margin-bottom: 5px;">
-          <strong>${accounts[pa.accountIndex].name}:</strong> 
-          $${Number(pa.amount).toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-        </li>`;
-    });
-    modalContentHtml += `</ul>
-      <button id="confirmPaymentBtn" style="margin-top: 10px; padding: 10px 15px;">Confirmar Pagos</button>
-    `;
-    
-    if (!modal) {
-      modal = document.createElement('div');
-      modal.id = 'paymentNotificationModal';
-      modal.className = 'modal';
-      modal.style.display = 'flex';
-      modal.style.position = 'fixed';
-      modal.style.top = '0';
-      modal.style.left = '0';
-      modal.style.width = '100%';
-      modal.style.height = '100%';
-      modal.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
-      modal.style.alignItems = 'center';
-      modal.style.justifyContent = 'center';
-      modal.innerHTML = `
-        <div class="modal-content" style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 5px; text-align: center;">
-          ${modalContentHtml}
-        </div>
-      `;
-      document.body.appendChild(modal);
-    } else {
-      modal.querySelector('.modal-content').innerHTML = modalContentHtml;
-      modal.style.display = 'flex';
-    }
-    
-    // Al hacer clic en el botón se confirman los pagos para cada cuenta pendiente
-    document.getElementById('confirmPaymentBtn').onclick = function() {
-      confirmWeeklyPayments(pendingAccounts);
-      modal.style.display = 'none';
-    };
-    
-    // Oculta el modal al hacer clic fuera del contenido
-    modal.onclick = function(e) {
-      if (e.target === modal) {
-        modal.style.display = 'none';
-      }
-    };
-  }
+  
 
-  // Al confirmar los pagos, se genera un ingreso para cada cuenta pendiente (tipo "Ingreso")
-  function confirmWeeklyPayments(pendingAccounts) {
-    const todayStr = formatDateForInput(new Date());
-    pendingAccounts.forEach(pa => {
-      const newIncome = {
-        creationDate: todayStr,
-        description: 'Ingreso por pago del viernes',
-        accountIndex: pa.accountIndex,
-        type: 'Ingreso',
-        cost: pa.amount,
-        quantity: 1,
-        months: 0,
-        total: pa.amount
-      };
-      transactions.push(newIncome);
-    });
-    saveTransactions();
-    renderTransactions();
-    updateAccountsChart();
-    alert('Se han generado los ingresos correspondientes a los pagos semanales.');
-  }
-
-  // --- Inicialización ---
   window.onload = function () {
     document.getElementById('currentDate').innerText = formatFullDate(new Date());
     loadAccounts();
     loadTransactions();
-    // Se llama a la verificación del pago semanal considerando todas las cuentas
     checkWeeklyPaymentNotification();
   };
 </script>
