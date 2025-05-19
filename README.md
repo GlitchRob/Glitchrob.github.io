@@ -1,10 +1,17 @@
-Aplicación web móvil Html css y javascript diseñada con chatgpt o3-mini para administración de finanzas personales.
-¿qué puede hacer?
-gestionar tarjetas cuentas de crédito 
-gestionar sus fechas de pago y corte
-al crear transacciones calcula la fecha de pago en base a la fecha de corte automáticamente
-da información sobre pagos mensuales 
-da información sobre pagos semanales 
-da información sobre pagos quincenales
-...[]
-vista aquí https://glitchrob.github.io/index.html
+# Aplicación Web Móvil para Administración de Finanzas Personales
+
+Esta aplicación web fue desarrollada con **HTML**, **CSS** y **JavaScript**, utilizando el modelo **ChatGPT o3-mini** como asistente en su diseño. Está pensada para ayudarte a gestionar tus finanzas personales de forma sencilla desde tu dispositivo móvil.
+
+## Funcionalidades
+
+- Gestión de **tarjetas** y **cuentas de crédito**.
+- Control automático de **fechas de corte** y **fechas de pago**.
+- Registro de **transacciones** con cálculo automático de la próxima fecha de pago según la fecha de corte.
+- Información clara y organizada sobre pagos:
+  - **Mensuales**
+  - **Semanales**
+  - **Quincenales**
+
+## Enlace a la aplicación
+
+[https://glitchrob.github.io/index.html](https://glitchrob.github.io/index.html)
