@@ -1,0 +1,1182 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>App - Cuentas y Transacciones (Próximos pagos con restante)</title>
+
+<link href="https://cdn.jsdelivr.net/npm/intro.js/minified/introjs.min.css" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:Arial, sans-serif;
+    background:#0b0b0b;color:#fff;
+    display:flex;flex-direction:column;min-height:100vh;padding-bottom:110px;
+  }
+  main{flex:1;padding:16px;overflow:auto;}
+  .top-row{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+  #calendario{margin-left:auto;background:transparent;border:1px solid rgba(255,255,255,.08);color:#fff;padding:6px 8px;border-radius:6px;}
+  /* Next payment box */
+  #next-payment{margin-left:12px;background:linear-gradient(90deg,#1b1b1b,#0f0f0f);padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.04);font-size:14px;color:#fff;min-width:320px;max-width:52%;}
+  #next-payment.collapsed{max-width:220px;}
+  .next-header{display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer}
+  .next-header .title{font-weight:700}
+  .next-list{margin-top:6px;display:flex;flex-direction:column;gap:6px;transition:all .18s ease}
+  #next-payment.collapsed .next-list{display:none}
+  .next-item{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px;border-radius:8px;background:#0f0f0f;border:1px solid rgba(255,255,255,.03)}
+  .next-item .left{display:flex;flex-direction:column;}
+  .next-accounts{font-size:12px;color:#cfcfcf;margin-top:4px}
+  .badge-danger{background:#ff5252;color:#fff;padding:2px 8px;border-radius:999px;font-size:12px}
+  .chev { transition: transform .18s; display:inline-block; vertical-align:middle; }
+  #next-payment.collapsed .chev { transform: rotate(-90deg); }
+
+  /* ALERT box */
+  .alert-box{
+    position:fixed;
+    left:16px;
+    bottom:86px;
+    z-index:220;
+    background:linear-gradient(180deg,#2b2b2b,#111);
+    border:1px solid rgba(255,255,255,.06);
+    color:#fff;
+    padding:12px;
+    border-radius:10px;
+    width:320px;
+    box-shadow:0 8px 30px rgba(0,0,0,.6);
+    display:none;
+  }
+  .alert-box .title{font-weight:800;margin-bottom:8px}
+  .alert-box .list{font-size:13px;color:#ddd;margin-bottom:10px;max-height:160px;overflow:auto}
+  .alert-actions{display:flex;gap:8px;justify-content:flex-end}
+  .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,.08);color:#fff;padding:6px 8px;border-radius:6px;cursor:pointer}
+  .btn-primary{background:#03a9f4;color:#000;padding:6px 10px;border-radius:6px;border:none;cursor:pointer}
+  .btn-danger{background:#ff5252;color:#fff;padding:6px 10px;border-radius:6px;border:none;cursor:pointer}
+
+  .section{margin-bottom:26px}
+  .section h2{font-size:18px;margin-bottom:12px;color:#fff}
+  #accounts-list{display:flex;flex-wrap:wrap;gap:8px}
+  .account-item{min-width:120px;max-width:260px;padding:10px;border-radius:10px;border:1.5px solid rgba(255,255,255,.12);background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));cursor:pointer;position:relative;transition:transform .12s,box-shadow .12s}
+  .account-item:hover{transform:translateY(-3px);box-shadow:0 6px 18px rgba(0,0,0,.6)}
+  .account-item.selected-account{background:linear-gradient(90deg,#4b0082,#000);border-color:rgba(255,255,255,.14)}
+  .account-badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;margin-top:6px;color:#111;background:#fff}
+  .account-small{font-size:12px;color:#cfcfcf;margin-top:6px}
+  .global-total{text-align:right;font-weight:700;margin-bottom:8px;color:#fff}
+  #transactions-list{margin-top:4px}
+  .month-section{margin-bottom:12px;padding:8px;border-radius:10px;background:linear-gradient(90deg, rgba(255,255,255,.02), rgba(255,255,255,.01));border:1px solid rgba(255,255,255,.03)}
+  .month-header{display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer}
+  .month-title{font-weight:700;font-size:16px}
+  .month-total{font-weight:700;color:#ff7b7b}
+  .month-section.collapsed .week-section{display:none}
+  .week-section{margin-top:8px;padding:8px;border-radius:8px;background:linear-gradient(180deg, rgba(0,0,0,.3), rgba(0,0,0,.45))}
+  .week-title{text-align:center;font-weight:700;margin-bottom:8px;color:#e6e6e6}
+  .list-item{display:flex;align-items:center;justify-content:space-between;padding:8px;border-radius:8px;margin-bottom:8px;background:linear-gradient(90deg, rgba(255,255,255,.02), rgba(255,255,255,.01));position:relative}
+  .list-item.income{border-left:4px solid #00c853}
+  .list-item.expense{border-left:4px solid #ff5252}
+  .list-left{display:flex;flex-direction:column;gap:4px}
+  .list-right{text-align:right;min-width:140px}
+  .list-item .account-name{font-size:12px;color:#cfcfcf}
+  .edit-btn{position:absolute;right:8px;top:6px;font-size:18px;cursor:pointer;color:#fff}
+  .empty-placeholder{text-align:center;color:#777;margin:30px 0}
+  .empty-placeholder .material-icons{font-size:48px;color:#777;margin-bottom:8px}
+
+  .period-badge{font-size:12px;color:#ddd;margin-top:6px}
+  .available-box{margin-top:8px;padding:8px;border-radius:8px;background:#101010;border:1px solid rgba(255,255,255,.04);display:flex;flex-direction:column;gap:6px}
+  .available-row{display:flex;justify-content:space-between;align-items:center}
+  .available-label{font-weight:700;color:#fff}
+  .available-amount{font-weight:700}
+  .available-amount.positive{color:#00e676}
+  .available-amount.negative{color:#ff5252}
+  .available-note{font-size:13px;color:#d0d0d0}
+
+  .fab-container{position:fixed;right:20px;bottom:120px;display:flex;flex-direction:column;gap:8px;z-index:120;align-items:flex-end}
+  .fab-button{width:56px;height:56px;border-radius:50%;background:#6200ea;display:flex;align-items:center;justify-content:center;color:#fff;border:none;font-size:28px;box-shadow:0 6px 18px rgba(0,0,0,.6)}
+  .fab-options{display:none;flex-direction:column;align-items:flex-end;gap:8px}
+  .fab-option{background:#3700b3;color:#fff;padding:8px 12px;border-radius:8px;border:none;cursor:pointer;display:flex;align-items:center;gap:8px}
+  .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:200;padding:12px}
+  .modal{background:#fff;color:#000;border-radius:10px;padding:16px;width:100%;max-width:520px;max-height:90vh;overflow:auto}
+  .modal h3{margin-bottom:8px}
+  .modal label{font-size:14px;margin-top:8px;display:block;color:#333}
+  .modal input,.modal select{width:100%;padding:8px;margin-top:6px;border-radius:6px;border:1px solid #ddd}
+  .modal .row{display:flex;gap:8px}
+  .modal-buttons{margin-top:12px;text-align:right}
+  .btn-delete{background:#e53935;color:#fff;border:none;padding:8px 12px;border-radius:6px;cursor:pointer}
+  .btn-primary{background:#03a9f4;color:#fff;border:none;padding:8px 12px;border-radius:6px;cursor:pointer}
+  .bottom-nav{position:fixed;left:0;right:0;bottom:0;height:64px;background:#121212;border-top:1px solid rgba(255,255,255,.03);display:flex;gap:8px;align-items:center;justify-content:space-around;z-index:130}
+  .nav-item{color:#bdbdbd;font-size:12px;text-align:center;cursor:pointer}
+  .nav-item .material-icons{display:block;font-size:22px;margin-bottom:4px}
+  .nav-item.active{color:#fff}
+  @media (max-width:520px){.account-item{min-width:48%}.list-right{min-width:110px} #next-payment{max-width:70%}}
+</style>
+</head>
+<body>
+  <main>
+    <div class="top-row">
+      <div id="next-payment" title="Próximos pagos" role="region" aria-label="Próximos pagos">
+        <!-- content injected by JS -->
+      </div>
+      <input id="calendario" type="date" />
+    </div>
+
+    <div class="section" id="accounts-section" data-intro="Aquí aparecen todas tus cuentas." data-step="2">
+      <h2>Cuentas</h2>
+      <div id="accounts-list"></div>
+    </div>
+
+    <div class="section" id="transactions-section" data-intro="Esta sección muestra tus transacciones agrupadas." data-step="3">
+      <h2>Transacciones</h2>
+      <div id="global-total-container" class="global-total" data-intro="Aquí ves el total global." data-step="4"></div>
+      <div id="transactions-list"></div>
+    </div>
+
+    <div class="fab-container" data-intro="Añade cuentas o transacciones aquí." data-step="1">
+      <div class="fab-options" id="fab-options">
+        <button class="fab-option" id="add-account-btn"><span class="material-icons">add_card</span> Cuenta</button>
+        <button class="fab-option" id="add-transaction-btn"><span class="material-icons">payments</span> Transacción</button>
+      </div>
+      <button class="fab-button" id="fab-main-btn"><span class="material-icons">add</span></button>
+    </div>
+  </main>
+
+  <!-- Alert box -->
+  <div id="payment-alert" class="alert-box" role="alert" aria-live="polite">
+    <div class="title">Alerta: pagos próximos</div>
+    <div class="list" id="payment-alert-list"></div>
+    <div class="alert-actions">
+      <button id="alert-snooze" class="btn-ghost">Posponer 1 día</button>
+      <button id="alert-never" class="btn-danger">No volver a mostrar</button>
+      <button id="alert-view" class="btn-primary">Ver próximos pagos</button>
+    </div>
+  </div>
+
+  <nav class="bottom-nav">
+    <div class="nav-item active" id="nav-home"><span class="material-icons">home</span>Inicio</div>
+    <div class="nav-item" id="nav-accounts"><span class="material-icons">account_balance</span>Cuentas</div>
+    <div class="nav-item" id="nav-transactions"><span class="material-icons">receipt</span>Transacciones</div>
+    <div class="nav-item" id="nav-settings"><span class="material-icons">settings</span>Config.</div>
+  </nav>
+
+  <!-- Tutorial modal -->
+  <div class="modal-backdrop" id="tutorial-modal">
+    <div class="modal">
+      <h3>Bienvenido a la App de Cuentas</h3>
+      <p>Este recorrido te guiará paso a paso:</p>
+      <ul style="margin-left:18px;color:#333">
+        <li>1. Ve tus cuentas</li>
+        <li>2. Observa tus transacciones</li>
+        <li>3. Consulta el total global</li>
+        <li>4. Añade cuentas/transacciones con el botón +</li>
+      </ul>
+      <label style="margin-top:8px"><input type="checkbox" id="tutorial-checkbox"> No volver a mostrar</label>
+      <div class="modal-buttons">
+        <button id="tutorial-start" class="btn-primary">Comenzar Tutorial</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings modal -->
+  <div class="modal-backdrop" id="settings-modal">
+    <div class="modal">
+      <h3>Configuración</h3>
+      <p>Seleccione cómo desea calcular el pago por periodo:</p>
+      <label><input type="radio" name="paymentPeriod" value="weekly"> Pago semanal</label><br>
+      <label><input type="radio" name="paymentPeriod" value="biweekly"> Pago quincenal</label>
+
+      <hr style="margin:12px 0">
+
+      <h4>Próximos pagos</h4>
+      <label>Mostrar próximos (N):</label>
+      <input id="upcoming-count" type="number" min="1" value="3" />
+      <label><input id="upcoming-include" type="checkbox"> Incluir fechas de cuenta sin transacciones</label>
+      <label>Días para alerta (resaltar si el pago está dentro de):</label>
+      <input id="upcoming-alert-days" type="number" min="0" value="7" />
+
+      <div style="margin-top:12px" id="current-period-note"></div>
+      <div class="modal-buttons">
+        <button id="settings-cancel">Cancelar</button>
+        <button id="settings-save" class="btn-primary">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Account modal -->
+  <div class="modal-backdrop" id="account-modal">
+    <div class="modal">
+      <h3 id="account-modal-title">Agregar Cuenta</h3>
+
+      <label>Tipo de cuenta</label>
+      <select id="acc-type">
+        <option value="credito">Crédito</option>
+        <option value="debito">Débito</option>
+        <option value="efectivo">Efectivo</option>
+        <option value="ahorros">Ahorros</option>
+      </select>
+
+      <label>Nombre</label><input id="acc-name" type="text" />
+
+      <!-- Crédito: límite total + disponible + corte/pago -->
+      <div id="credit-fields" style="display:none">
+        <label>Límite total</label><input id="acc-limitTotal" type="number" min="0" step="0.01" />
+        <label>Disponible inicial</label><input id="acc-available" type="number" step="0.01" />
+        <div class="row">
+          <div style="flex:1">
+            <label>Fecha de corte</label><input id="acc-cutDate" type="date" />
+          </div>
+          <div style="flex:1">
+            <label>Fecha de pago</label><input id="acc-payDate" type="date" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Otros tipos: sólo disponible inicial -->
+      <div id="noncredit-fields" style="display:none">
+        <label>Disponible inicial</label><input id="acc-available-nc" type="number" step="0.01" />
+      </div>
+
+      <div class="modal-buttons">
+        <button id="acc-cancel">Cancelar</button>
+        <button id="acc-save" class="btn-primary">Guardar</button>
+        <button id="acc-delete" class="btn-delete">Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Transaction modal -->
+  <div class="modal-backdrop" id="transaction-modal">
+    <div class="modal">
+      <h3 id="tx-modal-title">Agregar Transacción</h3>
+      <label>Descripción</label><input id="tx-desc" type="text" />
+      <label>Monto total</label><input id="tx-amount" type="number" />
+      <label>Tipo</label>
+      <select id="tx-type"><option value="income">Ingreso</option><option value="expense">Gasto</option></select>
+      <label>Fecha transacción</label><input id="tx-inputDate" type="date" />
+      <label>Pagos en meses</label><input id="tx-months" type="number" min="1" value="1" />
+      <label>Cuenta original</label><select id="tx-account"></select>
+
+      <div id="split-container" style="display:none;margin-top:8px">
+        <h4 style="margin:0 0 8px 0;color:#333">Selecciona cuentas para split:</h4>
+        <ul id="accounts-for-split" style="list-style:none;padding:0;max-height:140px;overflow:auto;margin-bottom:8px"></ul>
+        <label>Montos a distribuir (uno por cuenta, separados por comas)</label>
+        <input id="tx-split-input" type="text" placeholder="100,50,30" />
+      </div>
+
+      <div class="recurrence-options" id="recurrence-options" style="display:none;margin-top:8px">
+        <strong>Modificar/Eliminar:</strong><br>
+        <label><input type="radio" name="recurrenceEdit" value="single" checked> Esta cuota</label>
+        <label><input type="radio" name="recurrenceEdit" value="all"> Todas las cuotas</label>
+      </div>
+
+      <div class="modal-buttons">
+        <button id="tx-cancel">Cancelar</button>
+        <button id="tx-save" class="btn-primary">Guardar</button>
+        <button id="tx-delete" class="btn-delete">Eliminar</button>
+        <button id="tx-split-toggle" class="btn-primary" style="background:#03dac6;color:#000">Split</button>
+        <button id="tx-split-confirm" class="btn-primary" style="display:inline-block;background:#018786">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/intro.js/minified/intro.min.js"></script>
+  <script>
+    /* ------------------------------
+       Estado / utilidades centrales
+       ------------------------------ */
+    const COLL_KEY='collapsedMonths', TUT_KEY='hideTutorial', PREF_KEY='paymentPeriod',
+          UPC_COUNT='upcomingCount', UPC_INC='upcomingIncludeAccountDates', UPC_ADAYS='upcomingAlertDays',
+          NEXT_COLL_KEY = 'nextPaymentCollapsed',
+          ALERT_SUPPRESS_KEY = 'upcomingAlertSuppress',
+          ALERT_SNOOZE_KEY = 'upcomingAlertSnoozeUntil'; // ISO date string
+
+    const GET = k => JSON.parse(localStorage.getItem(k) || '[]'),
+          SET = (k,v) => localStorage.setItem(k, JSON.stringify(v)),
+          loadCollapseState = ()=> JSON.parse(localStorage.getItem(COLL_KEY) || '{}'),
+          saveCollapseState = s => localStorage.setItem(COLL_KEY, JSON.stringify(s));
+
+    function getStoredPref(key, fallback){
+      const raw = localStorage.getItem(key);
+      if(raw === null || raw === undefined) return fallback;
+      try { return JSON.parse(raw); } catch(e){ return raw; }
+    }
+    function setStoredPref(key,val){ localStorage.setItem(key, JSON.stringify(val)); }
+
+    function getPaymentPeriodPref(){ return localStorage.getItem(PREF_KEY) || 'weekly' }
+    function setPaymentPeriodPref(v){ localStorage.setItem(PREF_KEY, v) }
+
+    function getUpcomingCount(){ return parseInt(getStoredPref(UPC_COUNT, 3),10) || 3 }
+    function setUpcomingCount(n){ setStoredPref(UPC_COUNT, Number(n)) }
+    function getUpcomingInclude(){ return Boolean(getStoredPref(UPC_INC, true)) }
+    function setUpcomingInclude(b){ setStoredPref(UPC_INC, Boolean(b)) }
+    function getUpcomingAlertDays(){ return parseInt(getStoredPref(UPC_ADAYS, 7),10) || 7 }
+    function setUpcomingAlertDays(n){ setStoredPref(UPC_ADAYS, Number(n)) }
+
+    function getNextCollapsed(){ return localStorage.getItem(NEXT_COLL_KEY) === 'true' }
+    function setNextCollapsed(b){ localStorage.setItem(NEXT_COLL_KEY, b ? 'true' : 'false') }
+
+    function getAlertSuppress(){ return localStorage.getItem(ALERT_SUPPRESS_KEY) === 'true' }
+    function setAlertSuppress(b){ localStorage.setItem(ALERT_SUPPRESS_KEY, b ? 'true' : 'false') }
+    function getAlertSnoozeUntil(){ return localStorage.getItem(ALERT_SNOOZE_KEY) || null }
+    function setAlertSnoozeUntil(iso){ if(iso===null) localStorage.removeItem(ALERT_SNOOZE_KEY); else localStorage.setItem(ALERT_SNOOZE_KEY, iso) }
+    function isAlertSnoozed(){
+      const s = getAlertSnoozeUntil(); if(!s) return false;
+      const now = new Date(); now.setHours(0,0,0,0);
+      const until = parseISOToLocal(s); if(!until) return false;
+      until.setHours(0,0,0,0);
+      return now <= until;
+    }
+
+    let selectedAccountIndices = JSON.parse(localStorage.getItem('selectedAccountIndices')||'[]'),
+        editingAccountIndex = null,
+        editingTransactionId = null,
+        editingRecurringId = null;
+
+    function showModal(id){ const el = document.getElementById(id); if(el) el.style.display='flex' }
+    function hideModal(id){ const el = document.getElementById(id); if(el) el.style.display='none' }
+    function makeId(){ return Date.now().toString(36)+'-'+Math.random().toString(36).slice(2) }
+    function money(v){ return Number(v||0).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2}) }
+    function escapeHtml(s){ if (s === null || s === undefined) return ''; return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function _safeNumber(n){ return (typeof n === 'number' && !isNaN(n)) ? n : 0; }
+    function formatSigned(v){
+      if(typeof v !== 'number' || isNaN(v)) return '$0.00';
+      return v < 0 ? `-$${money(Math.abs(v))}` : `$${money(v)}`;
+    }
+
+    /* ------------------------------
+       Helpers para fechas: parse ISO -> Date local (evita desfase UTC)
+       ------------------------------ */
+    const MS_PER_DAY = 24*60*60*1000;
+    const MS_PER_WEEK = 7 * MS_PER_DAY;
+    const ANCHOR_FRIDAY_UTC = Date.UTC(1970,0,2);
+
+    function parseISOToLocal(iso){
+      if(!iso) return null;
+      const s = String(iso).slice(0,10); // YYYY-MM-DD
+      if(/^\d{4}-\d{2}-\d{2}$/.test(s)){
+        const [y,m,d] = s.split('-').map(Number);
+        return new Date(y, m-1, d); // crea fecha en zona local (sin desfase)
+      }
+      const dt = new Date(iso);
+      if(isNaN(dt)) return null;
+      return dt;
+    }
+
+    function getDayFromAccountPayDate(acc){
+      if(!acc || !acc.payDate) return null;
+      const parts = String(acc.payDate).split('-');
+      if(parts.length>=3) return +parts[2];
+      const parsed = parseInt(acc.payDate,10);
+      if(!isNaN(parsed)) return parsed;
+      const dt = parseISOToLocal(acc.payDate);
+      if(dt) return dt.getDate();
+      return null;
+    }
+    function buildDateForMonthKey(day, monthKey){
+      const [y,m] = monthKey.split('-').map(Number);
+      if(!y || !m) return null;
+      const monthIndex = m-1;
+      const lastDay = new Date(y, monthIndex+1, 0).getDate();
+      const dayValid = Math.min(day, lastDay);
+      return new Date(y, monthIndex, dayValid);
+    }
+    function formatDateDDMMYYYY(d){ if(!d) return ''; const yy=d.getFullYear(), mm=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0'); return `${dd}/${mm}/${yy}` }
+    function formatMonthTitle(k){ const [y,m]=k.split('-').map(Number); return new Date(y,m-1,1).toLocaleString('es-ES',{month:'long',year:'numeric'}) }
+
+    function getPaymentDateForTransaction(acc,date){
+      if(!acc || !acc.cutDate || !acc.payDate) return date;
+      const cutParts = acc.cutDate.split('-'), payParts = acc.payDate.split('-');
+      const cut = cutParts.length>=3 ? +cutParts[2] : (parseISOToLocal(acc.cutDate)?.getDate() || new Date(acc.cutDate).getDate());
+      const pay = payParts.length>=3 ? +payParts[2] : (parseISOToLocal(acc.payDate)?.getDate() || new Date(acc.payDate).getDate());
+      const d = parseISOToLocal(date) || new Date(date);
+      const day = d.getDate(), year = d.getFullYear(), mon = d.getMonth();
+      const base = pay < cut ? 1 : 0;
+      const adj = day > cut ? 1 : 0;
+      let m = mon + base + adj, y = year;
+      if(m > 11){ y += Math.floor(m/12); m %= 12; }
+      const out = new Date(y,m,pay);
+      return out.toISOString().slice(0,10);
+    }
+
+    function getFridayOfWeekUTC(date){
+      const d = new Date(date); d.setHours(0,0,0,0);
+      const day = d.getDay();
+      const offset = (5 - day + 7) % 7;
+      const f = new Date(d); f.setDate(d.getDate() + offset); f.setHours(0,0,0,0);
+      return f;
+    }
+
+    function getPeriodRangeForDate(dateStr, periodDays){
+      const date = parseISOToLocal(dateStr) || new Date(dateStr);
+      const friday = getFridayOfWeekUTC(date);
+      const weeksPerPeriod = Math.max(1, Math.round(periodDays / 7));
+      const fridayUTCms = Date.UTC(friday.getFullYear(), friday.getMonth(), friday.getDate());
+      const weekIndex = Math.floor((fridayUTCms - ANCHOR_FRIDAY_UTC) / MS_PER_WEEK);
+      const periodIndex = Math.floor(weekIndex / weeksPerPeriod);
+      const endWeekIndex = (periodIndex + 1) * weeksPerPeriod - 1;
+      const endFridayUTCms = ANCHOR_FRIDAY_UTC + endWeekIndex * MS_PER_WEEK;
+      const endFriday = new Date(endFridayUTCms);
+      const startDate = new Date(endFridayUTCms - (periodDays - 1) * MS_PER_DAY);
+      startDate.setHours(0,0,0,0); endFriday.setHours(0,0,0,0);
+      const key = endFriday.toISOString().slice(0,10);
+      return { key, start: startDate, end: endFriday };
+    }
+
+    function periodsBetweenTodayAnd(dateStr, periodDays){
+      try{
+        const today = new Date(); today.setHours(0,0,0,0);
+        const target = parseISOToLocal(dateStr) || new Date(dateStr);
+        target.setHours(0,0,0,0);
+        const msDiff = target - today;
+        const days = Math.ceil(msDiff / MS_PER_DAY);
+        const periods = Math.max(1, Math.ceil(days / periodDays));
+        return periods;
+      } catch(e){
+        return 1;
+      }
+    }
+
+    /* ------------------------------
+       Ajuste disponible según transacciones
+       ------------------------------ */
+    function adjustAccountsAvailableByTxs(txs, multiplier = 1){
+      if(!Array.isArray(txs) || txs.length===0) return;
+      const accounts = GET('accounts');
+      let changed = false;
+      txs.forEach(tx => {
+        const idx = tx.accountIndex;
+        if(idx === undefined || idx === null) return;
+        const acc = accounts[idx];
+        if(!acc) return;
+        acc.available = Number(acc.available || 0) + multiplier * Number(tx.amount || 0);
+        acc.available = Math.round(acc.available * 100) / 100;
+        changed = true;
+      });
+      if(changed) SET('accounts', accounts);
+    }
+
+    /* ------------------------------
+       Próximos pagos: solo gastos (amount < 0), por transacción,
+       agrupados por fecha, filtrados por alertDays, y calcula "restante periodo"
+       ------------------------------ */
+    function getUpcomingPaymentsGrouped(limit = null, alertDays = null, periodDays = 7){
+      const accounts = GET('accounts') || [];
+      const txs = GET('transactions') || [];
+      const today = new Date(); today.setHours(0,0,0,0);
+
+      // 1) recolectar candidatos: gastos de cuentas crédito, fecha >= hoy
+      const candidates = [];
+      txs.forEach(t=>{
+        const acc = accounts[t.accountIndex];
+        if(!acc) return;
+        if(acc.type !== 'credito') return;      // solo crédito
+        const amountNum = Number(t.amount || 0);
+        if(!(amountNum < 0)) return;            // solo gastos
+        const payISO = (t.paymentDate || t.date || t.inputDate || '').slice(0,10);
+        if(!payISO) return;
+        const dt = parseISOToLocal(payISO);
+        if(!dt) return;
+        dt.setHours(0,0,0,0);
+        if(dt < today) return; // desde hoy en adelante
+        candidates.push({
+          dateISO: payISO,
+          dateObj: dt,
+          accountIndex: t.accountIndex,
+          accountName: acc.name || ('Cuenta '+t.accountIndex),
+          amountDue: amountNum,
+          txId: t.id
+        });
+      });
+
+      // 2) agrupar por dateISO (sumar montos y coleccionar items)
+      const map = {}; // key: dateISO -> { dateISO, dateObj, totalAmount, items: [...] }
+      candidates.forEach(c=>{
+        const k = c.dateISO;
+        if(!map[k]) map[k] = { dateISO: k, dateObj: c.dateObj, totalAmount: 0, items: [] };
+        map[k].totalAmount += Number(c.amountDue || 0);
+        map[k].items.push({ accountIndex: c.accountIndex, accountName: c.accountName, amount: c.amountDue, txId: c.txId });
+      });
+
+      // 3) convertir a array y ordenar por fecha asc
+      let arr = Object.values(map).sort((a,b)=> a.dateObj.getTime() - b.dateObj.getTime());
+
+      // 4) filtrar por alertDays si se indicó (solo incluir grupos dentro de rango)
+      if(alertDays !== null && alertDays !== undefined){
+        const todayMs = new Date(); todayMs.setHours(0,0,0,0);
+        arr = arr.filter(entry => {
+          const daysLeft = Math.ceil((entry.dateObj - todayMs)/MS_PER_DAY);
+          return daysLeft <= Number(alertDays);
+        });
+      }
+
+      // 5) calcular "restante del periodo" para cada entrada
+      arr.forEach(entry=>{
+        // calcular periodo que contiene entry.dateISO
+        const pr = getPeriodRangeForDate(entry.dateISO, periodDays);
+        // sumar todas las transacciones de cuentas tipo 'credito' cuyo paymentDate cae dentro del periodo
+        const txsAll = GET('transactions') || [];
+        let netPeriod = 0;
+        txsAll.forEach(tx=>{
+          const acc = GET('accounts')[tx.accountIndex];
+          if(!acc || acc.type !== 'credito') return;
+          const pay = parseISOToLocal(tx.paymentDate || tx.date || tx.inputDate);
+          if(!pay) return;
+          pay.setHours(0,0,0,0);
+          if(pay >= pr.start && pay <= pr.end){
+            netPeriod += Number(tx.amount || 0);
+          }
+        });
+        // Si netPeriod < 0 => restante = abs(netPeriod); si >=0 => pagado (0)
+        entry.remaining = netPeriod < 0 ? Math.round(Math.abs(netPeriod) * 100) / 100 : 0;
+        entry.periodStart = pr.start;
+        entry.periodEnd = pr.end;
+      });
+
+      // 6) limitar
+      if(limit && Number(limit) > 0) return arr.slice(0, Number(limit));
+      return arr;
+    }
+
+    /* ------------------------------
+       ALERT UI: mostrar/ocultar, snooze, never show
+       ------------------------------ */
+    function showPaymentAlertIfNeeded(grouped){
+      const alertEl = document.getElementById('payment-alert');
+      const listEl = document.getElementById('payment-alert-list');
+      if(!alertEl || !listEl) return;
+      if(getAlertSuppress()) { alertEl.style.display='none'; return; }
+      if(isAlertSnoozed()) { alertEl.style.display='none'; return; }
+      if(!grouped || grouped.length===0){ alertEl.style.display='none'; return; }
+
+      // construir contenido (máx 6 entradas)
+      const html = grouped.slice(0,6).map(entry=>{
+        const totalLabel = formatSigned(entry.totalAmount);
+        const remainingLabel = entry.remaining && entry.remaining > 0 ? `$${money(entry.remaining)}` : '<strong style="color:#8bc34a">Pagado</strong>';
+        const details = entry.items.map(it => `${escapeHtml(it.accountName)}: ${formatSigned(it.amount)}`).join(' • ');
+        return `<div style="margin-bottom:6px"><strong>${formatDateDDMMYYYY(entry.dateObj)}</strong> — ${totalLabel}<div style="color:#ccc;font-size:13px">${details}</div><div style="font-size:13px;margin-top:4px">Restante periodo: ${remainingLabel}</div></div>`;
+      }).join('');
+      listEl.innerHTML = html;
+      alertEl.style.display = 'block';
+    }
+
+    function hidePaymentAlert(){ const alertEl=document.getElementById('payment-alert'); if(alertEl) alertEl.style.display='none' }
+
+    /* ------------------------------
+       Update Next Payments UI (usa alerta)
+       ------------------------------ */
+    function updateNextPaymentUI(){
+      try{
+        const el = document.getElementById('next-payment'); if(!el) return;
+        const n = getUpcomingCount();
+        const alertDays = getUpcomingAlertDays();
+        const pref = getPaymentPeriodPref();
+        const periodDays = pref === 'biweekly' ? 14 : 7;
+        const grouped = getUpcomingPaymentsGrouped(n, alertDays, periodDays);
+        const collapsed = getNextCollapsed();
+        if(collapsed) el.classList.add('collapsed'); else el.classList.remove('collapsed');
+
+        if(!grouped || grouped.length === 0){
+          el.innerHTML = `
+            <div class="next-header" id="next-toggle">
+              <div class="title">Próximos pagos</div>
+              <div><span class="material-icons chev">expand_more</span></div>
+            </div>
+            <div class="next-list"><div style="color:#ccc">— sin pagos dentro del rango de ${alertDays} d (solo gastos)</div></div>
+          `;
+          const toggleEl = document.getElementById('next-toggle');
+          if(toggleEl) toggleEl.onclick = toggleNextPaymentCollapse;
+          hidePaymentAlert();
+          return;
+        }
+
+        const today = new Date(); today.setHours(0,0,0,0);
+        let html = `<div class="next-header" id="next-toggle"><div class="title">Próximos pagos (${grouped.length})</div><div><span class="material-icons chev">expand_more</span></div></div><div class="next-list">`;
+
+        grouped.forEach(entry=>{
+          const daysLeft = Math.ceil((entry.dateObj - today)/MS_PER_DAY);
+          const highlight = daysLeft <= alertDays;
+          const totalLabel = formatSigned(entry.totalAmount);
+          const remainingLabel = entry.remaining && entry.remaining > 0 ? `$${money(entry.remaining)}` : `<span style="color:#8bc34a;font-weight:700">Pagado</span>`;
+          const details = entry.items.map(it => `${escapeHtml(it.accountName)}: ${formatSigned(it.amount)}`).join(' • ');
+
+          html += `<div class="next-item" title="Fecha: ${formatDateDDMMYYYY(entry.dateObj)}">
+            <div class="left">
+              <div style="font-weight:700">${formatDateDDMMYYYY(entry.dateObj)}</div>
+              <div class="next-accounts">${details}</div>
+              <div style="font-size:13px;color:#ccc;margin-top:6px">Restante periodo: ${remainingLabel}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="font-weight:700">${totalLabel}</div>
+              ${highlight ? `<div class="badge-danger">¡${daysLeft}d!</div>` : `<div style="color:#aaa;font-size:12px">${daysLeft}d</div>`}
+            </div>
+          </div>`;
+        });
+
+        html += `</div>`;
+        el.innerHTML = html;
+
+        const toggleEl = document.getElementById('next-toggle');
+        if(toggleEl) toggleEl.onclick = toggleNextPaymentCollapse;
+
+        if(getNextCollapsed()) el.classList.add('collapsed'); else el.classList.remove('collapsed');
+
+        // show alert if needed (only expenses grouped entries already filtered by alertDays)
+        showPaymentAlertIfNeeded(grouped);
+
+      } catch(e){
+        console.warn('Error actualizando próximos pagos', e);
+      }
+    }
+
+    function toggleNextPaymentCollapse(){
+      const el = document.getElementById('next-payment');
+      if(!el) return;
+      const isCollapsed = el.classList.toggle('collapsed');
+      setNextCollapsed(isCollapsed);
+    }
+
+    /* ------------------------------
+       Render cuentas/transacciones y CRUD
+       ------------------------------ */
+    function renderAccounts(){
+      const list = document.getElementById('accounts-list'); if(!list) return;
+      list.innerHTML='';
+      const all = document.createElement('div');
+      all.className = 'account-item' + (selectedAccountIndices.length===0 ? ' selected-account' : '');
+      all.innerHTML = `<div style="font-weight:700">Todas las transacciones</div><div class="account-small">Ver todo</div>`;
+      all.onclick = ()=>{ selectedAccountIndices = []; SET('selectedAccountIndices', selectedAccountIndices); renderAccounts(); renderTransactions(); updateNextPaymentUI(); };
+      list.appendChild(all);
+
+      const accounts = GET('accounts');
+      accounts.forEach((acc,i)=>{
+        const sel = selectedAccountIndices.includes(i);
+        const div = document.createElement('div'); div.className = 'account-item' + (sel ? ' selected-account' : '');
+        const badgeText = (acc.type || 'debito');
+        let badgeColor = '#fff';
+        if(badgeText==='credito') badgeColor='#ffd54f';
+        if(badgeText==='debito') badgeColor='#90caf9';
+        if(badgeText==='efectivo') badgeColor='#a5d6a7';
+        if(badgeText==='ahorros') badgeColor='#ce93d8';
+        const limitHtml = (acc.type==='credito') ? `<div class="account-small">Límite: $${money(acc.limitTotal||0)}</div>` : '';
+        div.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="font-weight:700">${escapeHtml(acc.name||'Cuenta')}</div>
+            <div class="account-badge" style="background:${badgeColor}">${escapeHtml(badgeText)}</div>
+          </div>
+          ${limitHtml}
+          <div class="account-small">Disponible: $${money(acc.available||0)}</div>
+        `;
+        div.onclick = ()=>{
+          if(sel) selectedAccountIndices = selectedAccountIndices.filter(x=>x!==i);
+          else selectedAccountIndices.push(i);
+          SET('selectedAccountIndices', selectedAccountIndices);
+          renderAccounts(); renderTransactions(); updateNextPaymentUI();
+        };
+        const eBtn = document.createElement('span'); eBtn.className='material-icons edit-btn'; eBtn.textContent='edit';
+        eBtn.onclick = e => { e.stopPropagation(); openAccountModal(i); };
+        div.appendChild(eBtn);
+        list.appendChild(div);
+      });
+    }
+
+    function renderTransactions(){
+      const cont = document.getElementById('transactions-list'); if(!cont) return;
+      cont.innerHTML='';
+      const allTx = GET('transactions');
+      const filtered = allTx.filter(t => selectedAccountIndices.length===0 || selectedAccountIndices.includes(t.accountIndex));
+      if(filtered.length===0){
+        cont.innerHTML = `<div class="empty-placeholder"><span class="material-icons">inbox</span><div>No hay transacciones.</div></div>`;
+        const g = document.getElementById('global-total-container'); if(g) g.textContent='';
+        updateNextPaymentUI();
+        return;
+      }
+      const totalG = filtered.reduce((s,t)=>s + (t.amount||0), 0);
+      const g = document.getElementById('global-total-container'); if(g) g.textContent = `Total global: $${money(totalG)}`;
+
+      const groupedByMonth = {};
+      filtered.forEach(t=>{
+        const pay = t.paymentDate || t.date || t.inputDate;
+        if(!pay) return;
+        const mKey = pay.slice(0,7);
+        if(!groupedByMonth[mKey]) groupedByMonth[mKey] = [];
+        groupedByMonth[mKey].push(t);
+      });
+
+      const pref = getPaymentPeriodPref();
+      const periodDays = pref === 'biweekly' ? 14 : 7;
+      const periodLabelSingular = pref === 'biweekly' ? 'quincena' : 'semana';
+      const periodLabelCapital = pref === 'biweekly' ? 'Pago quincenal' : 'Pago semanal';
+
+      const cs = loadCollapseState();
+
+      Object.keys(groupedByMonth).sort().forEach(mKey=>{
+        const rows = groupedByMonth[mKey];
+        const periodsMap = {}; const periodMeta = {};
+        rows.forEach(t=>{
+          const payDate = t.paymentDate || t.date || t.inputDate;
+          const pr = getPeriodRangeForDate(payDate, periodDays);
+          const key = pr.key;
+          if(!periodsMap[key]) periodsMap[key] = [];
+          periodsMap[key].push(t);
+          periodMeta[key] = pr;
+        });
+
+        const pagoPorPeriodo = Object.values(periodsMap).flat().reduce((s,tx)=>{
+          const payDate = tx.paymentDate || tx.date || tx.inputDate || new Date().toISOString().slice(0,10);
+          const periods = periodsBetweenTodayAnd(payDate, periodDays);
+          return s + (Number(tx.amount||0) / periods);
+        }, 0);
+
+        const tot = rows.reduce((s,t)=>s+(t.amount||0),0);
+
+        const mDiv = document.createElement('div');
+        mDiv.className = 'month-section' + (cs[mKey] ? ' collapsed' : '');
+        const header = document.createElement('div'); header.className='month-header';
+        header.innerHTML = `<div><div class="month-title">${formatMonthTitle(mKey)}</div><div class="month-weekly-average">${periodLabelCapital}: $${money(_safeNumber(pagoPorPeriodo))}</div></div><div style="text-align:right"><div class="month-total">$${money(tot)}</div></div>`;
+        header.onclick = ()=>{ mDiv.classList.toggle('collapsed'); cs[mKey]=mDiv.classList.contains('collapsed'); saveCollapseState(cs); };
+        mDiv.appendChild(header);
+
+        const sortedPeriodKeys = Object.keys(periodsMap).sort((a,b)=>{
+          const pa = periodMeta[a].end.getTime();
+          const pb = periodMeta[b].end.getTime();
+          return pa - pb;
+        });
+
+        sortedPeriodKeys.forEach(periodKey=>{
+          const txs = periodsMap[periodKey];
+          const meta = periodMeta[periodKey];
+          const wDiv = document.createElement('div'); wDiv.className='week-section';
+          const startLabel = formatDateDDMMYYYY(meta.start);
+          const endLabel = formatDateDDMMYYYY(meta.end);
+          const weekTitle = document.createElement('div'); weekTitle.className='week-title';
+          weekTitle.textContent = `${periodLabelSingular.charAt(0).toUpperCase()+periodLabelSingular.slice(1)} ${startLabel} al ${endLabel}`;
+          wDiv.appendChild(weekTitle);
+
+          txs.sort((a,b)=> {
+            const da = parseISOToLocal(a.paymentDate || a.date || a.inputDate);
+            const db = parseISOToLocal(b.paymentDate || b.date || b.inputDate);
+            return (da?.getTime() || 0) - (db?.getTime() || 0);
+          }).forEach(t=>{
+            const item = document.createElement('div');
+            const accounts = GET('accounts'); const accObj = accounts[t.accountIndex] || null;
+            const accName = accObj ? accObj.name : '';
+
+            let displayPaymentDate = '';
+            if(accObj && accObj.type === 'credito'){
+              const payDay = getDayFromAccountPayDate(accObj);
+              if(payDay && mKey){
+                const built = buildDateForMonthKey(payDay, mKey);
+                if(built) displayPaymentDate = formatDateDDMMYYYY(built);
+              } else {
+                const fallback = t.paymentDate || t.date || t.inputDate || '';
+                const pf = parseISOToLocal(fallback);
+                displayPaymentDate = pf ? formatDateDDMMYYYY(pf) : '';
+              }
+            }
+
+            item.className = 'list-item ' + ((t.amount||0) >= 0 ? 'income' : 'expense');
+
+            const txPayDate = t.paymentDate || t.date || t.inputDate || new Date().toISOString().slice(0,10);
+            const txPeriods = periodsBetweenTodayAnd(txPayDate, periodDays);
+            const txPeriodAmount = Number(t.amount || 0) / txPeriods;
+
+            const rightBlock = displayPaymentDate
+              ? `<div class="list-right"><div style="font-weight:700">${formatSigned(t.amount||0)}</div><div class="period-badge">Por ${periodLabelSingular}: ${formatSigned(txPeriodAmount)}</div><div style="font-size:12px;color:#ccc">Pago: <span style="font-weight:700;color:#ff8a65">${displayPaymentDate}</span></div></div>`
+              : `<div class="list-right"><div style="font-weight:700">${formatSigned(t.amount||0)}</div><div class="period-badge">Por ${periodLabelSingular}: ${formatSigned(txPeriodAmount)}</div></div>`;
+
+            item.innerHTML = `<div class="list-left"><div style="font-weight:700">${escapeHtml(t.description||'--')}</div><div class="account-name">${escapeHtml(accName)} ${accObj?('('+escapeHtml(accObj.type||'')+')'):''}</div><div style="font-size:12px;color:#bbb">Fecha: ${t.inputDate||t.date||''}</div></div>${rightBlock}`;
+
+            const eBtn = document.createElement('span'); eBtn.className='material-icons edit-btn'; eBtn.textContent='edit';
+            eBtn.onclick = e => { e.stopPropagation(); openTransactionModal(t.id); };
+            item.appendChild(eBtn);
+            wDiv.appendChild(item);
+          });
+
+          const netPeriod = txs.reduce((s,t)=>s + (t.amount||0), 0);
+          const availBox = document.createElement('div'); availBox.className='available-box';
+          const amtClass = netPeriod >= 0 ? 'available-amount positive' : 'available-amount negative';
+          availBox.innerHTML = `
+            <div class="available-row">
+              <div class="available-label">💰 Total ${periodLabelSingular}</div>
+              <div class="${amtClass}">${formatSigned(netPeriod)}</div>
+            </div>
+            <div class="available-note">Gastos restan, ingresos suman. (Suma neta del periodo)</div>
+          `;
+          wDiv.appendChild(availBox);
+
+          mDiv.appendChild(wDiv);
+        });
+
+        cont.appendChild(mDiv);
+      });
+
+      updateNextPaymentUI();
+    }
+
+    /* ------------------------------
+       Modales abrir/guardar/eliminar transacciones y cuentas
+       ------------------------------ */
+    function openAccountModal(idx=null){
+      editingAccountIndex = idx;
+      document.getElementById('account-modal-title').textContent = idx===null ? 'Agregar Cuenta' : 'Editar Cuenta';
+      const arr = GET('accounts'); const acc = idx!==null ? arr[idx] : null;
+      document.getElementById('acc-type').value = acc ? (acc.type || 'debito') : 'debito';
+      document.getElementById('acc-name').value = acc ? (acc.name||'') : '';
+      document.getElementById('acc-limitTotal').value = acc ? (acc.limitTotal||'') : '';
+      document.getElementById('acc-available').value = acc ? (acc.available||'') : '';
+      document.getElementById('acc-available-nc').value = acc ? (acc.available||'') : '';
+      document.getElementById('acc-cutDate').value = acc ? (acc.cutDate||'') : '';
+      document.getElementById('acc-payDate').value = acc ? (acc.payDate||'') : '';
+      toggleAccountFields();
+      document.getElementById('acc-delete').style.display = idx===null ? 'none' : 'inline-block';
+      showModal('account-modal');
+    }
+
+    function openTransactionModal(id=null){
+      editingTransactionId = id; editingRecurringId = null;
+      const txs = GET('transactions'); const t = txs.find(x => (x.id||x.recurringId) === id) || {};
+      document.getElementById('tx-desc').value = t.description || '';
+      document.getElementById('tx-amount').value = t.amount !== undefined ? Math.abs(t.amount) : '';
+      document.getElementById('tx-type').value = (t.amount||0) >= 0 ? 'income' : 'expense';
+      document.getElementById('tx-inputDate').value = t.inputDate || t.date || '';
+      document.getElementById('tx-months').value = t.months || 1;
+      const sel = document.getElementById('tx-account'); if(sel){ sel.innerHTML = ''; GET('accounts').forEach((a,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=a.name; if(i===t.accountIndex) o.selected=true; sel.appendChild(o); }); }
+      const ul = document.getElementById('accounts-for-split'); if(ul){ ul.innerHTML=''; GET('accounts').forEach((a,i)=>{ const li=document.createElement('li'); const chk=document.createElement('input'); chk.type='checkbox'; chk.value=i; chk.id='split-'+i; const lbl=document.createElement('label'); lbl.htmlFor='split-'+i; lbl.textContent=a.name; li.appendChild(chk); li.appendChild(lbl); ul.appendChild(li); }); }
+      const recOpts = document.getElementById('recurrence-options');
+      if(id !== null && t.recurringId && t.months > 1){ recOpts.style.display='block'; editingRecurringId = t.recurringId; } else if (recOpts) recOpts.style.display='none';
+      const sc = document.getElementById('split-container'); if(sc) sc.style.display='none';
+      const tsi = document.getElementById('tx-split-input'); if(tsi) tsi.value='';
+      const txd = document.getElementById('tx-delete'); if(txd) txd.style.display = id===null ? 'none' : 'inline-block';
+      showModal('transaction-modal');
+    }
+
+    /* ------------------------------
+       Inicialización y handlers
+       ------------------------------ */
+    document.addEventListener('DOMContentLoaded', ()=>{
+
+      // tutorial
+      if(!localStorage.getItem(TUT_KEY)) showModal('tutorial-modal');
+      const tutStart = document.getElementById('tutorial-start');
+      if(tutStart) tutStart.onclick = ()=>{
+        if(document.getElementById('tutorial-checkbox')?.checked) localStorage.setItem(TUT_KEY,'true');
+        hideModal('tutorial-modal');
+        introJs().setOptions({nextLabel:'Siguiente', prevLabel:'Anterior', doneLabel:'Finalizar'}).start();
+      };
+
+      // account modal field toggle
+      const accTypeSelect = document.getElementById('acc-type');
+      const creditFields = document.getElementById('credit-fields');
+      const nonCreditFields = document.getElementById('noncredit-fields');
+      window.toggleAccountFields = function(){
+        const v = accTypeSelect.value;
+        if(v === 'credito'){ creditFields.style.display='block'; nonCreditFields.style.display='none' }
+        else { creditFields.style.display='none'; nonCreditFields.style.display='block' }
+      };
+      if(accTypeSelect) accTypeSelect.addEventListener('change', window.toggleAccountFields);
+
+      // settings handlers
+      const settingsCancel = document.getElementById('settings-cancel');
+      if(settingsCancel) settingsCancel.onclick = ()=> hideModal('settings-modal');
+      const settingsSave = document.getElementById('settings-save');
+      if(settingsSave) settingsSave.onclick = ()=>{
+        const sel = document.querySelector('input[name="paymentPeriod"]:checked')?.value || 'weekly';
+        setPaymentPeriodPref(sel);
+        const upc = parseInt(document.getElementById('upcoming-count').value,10) || 3;
+        const upi = document.getElementById('upcoming-include').checked;
+        const upa = parseInt(document.getElementById('upcoming-alert-days').value,10) || 7;
+        setUpcomingCount(upc); setUpcomingInclude(upi); setUpcomingAlertDays(upa);
+        hideModal('settings-modal');
+        renderAccounts(); renderTransactions(); updateNextPaymentUI();
+      };
+
+      // account CRUD buttons
+      const addAccBtn = document.getElementById('add-account-btn');
+      if(addAccBtn) addAccBtn.onclick = ()=> openAccountModal();
+      const accCancel = document.getElementById('acc-cancel');
+      if(accCancel) accCancel.onclick = ()=> hideModal('account-modal');
+      const accSave = document.getElementById('acc-save');
+      if(accSave) accSave.onclick = ()=>{
+        if(editingAccountIndex !== null){
+          if(!confirm('¿Guardar cambios en la cuenta?')) return;
+        }
+        const type = document.getElementById('acc-type').value;
+        const name = document.getElementById('acc-name').value.trim();
+        const limitTotal = parseFloat(document.getElementById('acc-limitTotal').value || 0);
+        const availCredit = parseFloat(document.getElementById('acc-available').value || 0);
+        const availNC = parseFloat(document.getElementById('acc-available-nc').value || 0);
+        const cutDate = document.getElementById('acc-cutDate').value;
+        const payDate = document.getElementById('acc-payDate').value;
+
+        if(!name){ alert('Nombre inválido'); return; }
+        if(type === 'credito'){
+          if(isNaN(limitTotal) || limitTotal <= 0){ alert('Indica un límite total válido'); return; }
+          if(!cutDate || !payDate){ alert('Indica fecha de corte y fecha de pago'); return; }
+          const available = !isNaN(availCredit) ? availCredit : limitTotal;
+          const obj = { name, type, limitTotal: Math.round(limitTotal*100)/100, available: Math.round(available*100)/100, cutDate, payDate, createdAt: new Date().toISOString() };
+          const arr = GET('accounts');
+          if(editingAccountIndex === null) arr.push(obj); else arr[editingAccountIndex] = { ...arr[editingAccountIndex], ...obj };
+          SET('accounts', arr);
+        } else {
+          const available = !isNaN(availNC) ? availNC : 0;
+          const obj = { name, type, limitTotal: 0, available: Math.round(available*100)/100, cutDate: '', payDate: '', createdAt: new Date().toISOString() };
+          const arr = GET('accounts');
+          if(editingAccountIndex === null) arr.push(obj); else arr[editingAccountIndex] = { ...arr[editingAccountIndex], ...obj };
+          SET('accounts', arr);
+        }
+        hideModal('account-modal');
+        renderAccounts(); renderTransactions(); updateNextPaymentUI();
+      };
+      const accDelete = document.getElementById('acc-delete');
+      if(accDelete) accDelete.onclick = ()=>{
+        if(!confirm('¿Eliminar cuenta?')) return;
+        const arr = GET('accounts'); arr.splice(editingAccountIndex,1); SET('accounts',arr);
+        let tx = GET('transactions');
+        tx = tx.filter(t => t.accountIndex !== editingAccountIndex)
+               .map(t => ({ ...t, accountIndex: t.accountIndex > editingAccountIndex ? t.accountIndex - 1 : t.accountIndex }));
+        SET('transactions', tx);
+        selectedAccountIndices = []; SET('selectedAccountIndices', selectedAccountIndices);
+        hideModal('account-modal'); renderAccounts(); renderTransactions(); updateNextPaymentUI();
+      };
+
+      // transaction handlers
+      const addTxBtn = document.getElementById('add-transaction-btn');
+      if(addTxBtn) addTxBtn.onclick = ()=> openTransactionModal();
+      const txCancel = document.getElementById('tx-cancel');
+      if(txCancel) txCancel.onclick = ()=> hideModal('transaction-modal');
+      const txSave = document.getElementById('tx-save');
+      if(txSave) txSave.onclick = ()=>{
+        if(editingTransactionId !== null){
+          if(!confirm('¿Guardar cambios?')) return;
+        }
+        const desc = document.getElementById('tx-desc').value.trim(),
+              amtRaw = parseFloat(document.getElementById('tx-amount').value),
+              type = document.getElementById('tx-type').value,
+              date = document.getElementById('tx-inputDate').value,
+              months = parseInt(document.getElementById('tx-months').value,10),
+              accIdx = parseInt(document.getElementById('tx-account').value,10),
+              recMode = document.querySelector('input[name=recurrenceEdit]:checked')?.value || 'single';
+
+        if(!desc || isNaN(amtRaw) || !date || isNaN(accIdx) || isNaN(months) || months < 1){ alert('Datos inválidos'); return; }
+
+        const basePay = (type === 'expense') ? getPaymentDateForTransaction(GET('accounts')[accIdx], date) : date;
+        const value = (type === 'expense') ? -Math.abs(amtRaw) : Math.abs(amtRaw);
+        let arr = GET('transactions');
+
+        if(editingTransactionId === null){
+          const recId = makeId();
+          const created = [];
+          for(let i=0;i<months;i++){
+            const d = parseISOToLocal(basePay) || new Date(basePay);
+            d.setMonth(d.getMonth()+i);
+            const payStr = d.toISOString().slice(0,10);
+            const basePart = value / months;
+            const amount = i === months - 1 ? value - basePart*(months-1) : basePart;
+            const newTx = { id: makeId(), recurringId: recId, description: `${desc} (${i+1}/${months})`, amount, inputDate: date, date, paymentDate: payStr, accountIndex: accIdx, months, createdAt: new Date().toISOString() };
+            arr.push(newTx); created.push(newTx);
+          }
+          SET('transactions', arr);
+          adjustAccountsAvailableByTxs(created, +1);
+        } else {
+          const origArr = GET('transactions');
+          let origAffected = [];
+          if(recMode === 'all' && editingRecurringId){
+            origAffected = origArr.filter(tx => tx.recurringId === editingRecurringId);
+          } else {
+            origAffected = origArr.filter(tx => (tx.id || tx.recurringId) === editingTransactionId);
+          }
+          adjustAccountsAvailableByTxs(origAffected, -1);
+
+          if(recMode === 'all' && editingRecurringId){
+            const recTxs = origArr.filter(tx => tx.recurringId === editingRecurringId).sort((a,b)=>new Date(a.paymentDate)-new Date(b.paymentDate));
+            const newTxs = [];
+            recTxs.forEach((orig,i)=>{
+              const d = parseISOToLocal(basePay) || new Date(basePay);
+              d.setMonth(d.getMonth()+i);
+              const newPay = d.toISOString().slice(0,10);
+              const basePart = value / orig.months;
+              const newAmount = i === orig.months - 1 ? value - basePart*(orig.months-1) : basePart;
+              newTxs.push({ ...orig, description: `${desc} (${i+1}/${orig.months})`, amount: newAmount, inputDate: date, date, paymentDate: newPay, accountIndex: accIdx });
+            });
+            arr = arr.map(tx => {
+              const found = newTxs.find(ntx => ntx.id === tx.id);
+              return found ? found : tx;
+            });
+            SET('transactions', arr);
+            adjustAccountsAvailableByTxs(newTxs, +1);
+          } else {
+            let newTxObj = null;
+            arr = arr.map(tx => {
+              if((tx.id || tx.recurringId) === editingTransactionId){
+                newTxObj = { ...tx, description: desc, amount: value, inputDate: date, date, paymentDate: basePay, accountIndex: accIdx };
+                return newTxObj;
+              }
+              return tx;
+            });
+            SET('transactions', arr);
+            if(newTxObj) adjustAccountsAvailableByTxs([newTxObj], +1);
+          }
+        }
+
+        hideModal('transaction-modal');
+        renderAccounts(); renderTransactions(); updateNextPaymentUI();
+      };
+
+      const txDelete = document.getElementById('tx-delete');
+      if(txDelete) txDelete.onclick = ()=>{
+        if(!confirm('¿Eliminar la(s) transacción(es) seleccionada(s)?')) return;
+        const recMode = document.querySelector('input[name=recurrenceEdit]:checked')?.value || 'single';
+        let arr = GET('transactions'); let removed = [];
+        if(editingTransactionId !== null && recMode === 'all' && editingRecurringId){
+          removed = arr.filter(tx => tx.recurringId === editingRecurringId);
+          arr = arr.filter(tx => tx.recurringId !== editingRecurringId);
+        } else {
+          removed = arr.filter(tx => (tx.id || tx.recurringId) === editingTransactionId);
+          arr = arr.filter(tx => (tx.id || tx.recurringId) !== editingTransactionId);
+        }
+        adjustAccountsAvailableByTxs(removed, -1);
+        SET('transactions', arr);
+        hideModal('transaction-modal');
+        renderAccounts(); renderTransactions(); updateNextPaymentUI();
+      };
+
+      const txSplitToggle = document.getElementById('tx-split-toggle');
+      if(txSplitToggle) txSplitToggle.onclick = ()=>{
+        const sc = document.getElementById('split-container'); if(sc) sc.style.display = sc.style.display === 'none' ? 'block' : 'none';
+      };
+      const txSplitConfirm = document.getElementById('tx-split-confirm');
+      if(txSplitConfirm) txSplitConfirm.onclick = ()=>{
+        const checks = Array.from(document.querySelectorAll('#accounts-for-split input:checked'));
+        if(checks.length === 0) return alert('Selecciona al menos una cuenta para split');
+        const parts = document.getElementById('tx-split-input').value.split(',').map(x=>parseFloat(x.trim()));
+        if(parts.some(isNaN) || parts.length !== checks.length) return alert('Debes indicar montos válidos uno por cuenta');
+        let txs = GET('transactions'); const orig = txs.find(x => (x.id||x.recurringId) === editingTransactionId);
+        if(!orig) return alert('No se encontró la transacción original');
+        adjustAccountsAvailableByTxs([orig], -1);
+        txs = txs.filter(x => (x.id||x.recurringId) !== editingTransactionId);
+        const newSplits = [];
+        checks.forEach((chk,i)=>{
+          const nt = {
+            id: makeId(),
+            recurringId: orig.recurringId,
+            description: `${orig.description} (split ${i+1}/${checks.length})`,
+            amount: parts[i],
+            inputDate: orig.inputDate||orig.date,
+            date: orig.date,
+            paymentDate: orig.paymentDate,
+            accountIndex: +chk.value,
+            months: 1,
+            createdAt: new Date().toISOString()
+          };
+          txs.push(nt); newSplits.push(nt);
+        });
+        adjustAccountsAvailableByTxs(newSplits, +1);
+        SET('transactions', txs);
+        hideModal('transaction-modal');
+        renderAccounts(); renderTransactions(); updateNextPaymentUI();
+      };
+
+      // FAB
+      const fabMain = document.getElementById('fab-main-btn');
+      if(fabMain) fabMain.onclick = ()=>{
+        const opts = document.getElementById('fab-options'); if(!opts) return;
+        opts.style.display = opts.style.display === 'flex' ? 'none' : 'flex'; if(opts.style.display === 'flex') opts.style.flexDirection = 'column';
+      };
+
+      // ALERT buttons
+      const alertSnoozeBtn = document.getElementById('alert-snooze');
+      const alertNeverBtn = document.getElementById('alert-never');
+      const alertViewBtn = document.getElementById('alert-view');
+      if(alertSnoozeBtn) alertSnoozeBtn.onclick = ()=>{
+        // Posponer 1 día
+        const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()+1);
+        setAlertSnoozeUntil(d.toISOString().slice(0,10));
+        hidePaymentAlert();
+      };
+      if(alertNeverBtn) alertNeverBtn.onclick = ()=>{
+        if(!confirm('¿No volver a mostrar alertas de próximos pagos?')) return;
+        setAlertSuppress(true);
+        hidePaymentAlert();
+      };
+      if(alertViewBtn) alertViewBtn.onclick = ()=>{
+        // expandir panel y hacer scroll
+        const el = document.getElementById('next-payment');
+        if(el) { el.classList.remove('collapsed'); setNextCollapsed(false); el.scrollIntoView({behavior:'smooth'}); }
+        hidePaymentAlert();
+      };
+
+      // backdrop close
+      document.querySelectorAll('.modal-backdrop').forEach(m => { m.onclick = e => { if(e.target === m) hideModal(m.id); }; });
+
+      // seed demo (solo si no hay nada)
+      if(!localStorage.getItem('accounts')){
+        SET('accounts', [
+          { name:'Tarjeta A', type:'credito', limitTotal: 50000.00, available: 50000.00, cutDate:'2025-08-25', payDate:'2025-08-15', createdAt: new Date().toISOString() },
+          { name:'Cuenta Débito', type:'debito', limitTotal: 0, available: 8000.00, cutDate:'', payDate:'', createdAt: new Date().toISOString() },
+          { name:'Efectivo', type:'efectivo', limitTotal: 0, available: 1200.00, cutDate:'', payDate:'', createdAt: new Date().toISOString() }
+        ]);
+      }
+      if(!localStorage.getItem('transactions')){
+        SET('transactions', [
+          { id: makeId(), recurringId: makeId(), description:'Compra supermercado', amount: -1200, inputDate:'2025-08-09', date:'2025-08-09', paymentDate:'2025-08-15', accountIndex:0, months:1, createdAt:new Date().toISOString() },
+          { id: makeId(), recurringId: makeId(), description:'Compra farmacia', amount: -350, inputDate:'2025-08-09', date:'2025-08-09', paymentDate:'2025-08-15', accountIndex:0, months:1, createdAt:new Date().toISOString() },
+          { id: makeId(), recurringId: makeId(), description:'Pago freelance', amount: 3000, inputDate:'2025-08-10', date:'2025-08-10', paymentDate:'2025-08-10', accountIndex:1, months:1, createdAt:new Date().toISOString() }
+        ]);
+        adjustAccountsAvailableByTxs(GET('transactions'), +1);
+      }
+
+      // restore next-payment collapsed state visually on load
+      if(getNextCollapsed()){
+        const el = document.getElementById('next-payment'); if(el) el.classList.add('collapsed');
+      }
+      // if user suppressed alerts previously, hide alert initially
+      if(getAlertSuppress()){
+        const a = document.getElementById('payment-alert'); if(a) a.style.display='none';
+      }
+
+      // initial render
+      renderAccounts(); renderTransactions(); updateNextPaymentUI();
+    });
+
+    /* ------------------------------
+       Open settings (global) y nav
+       ------------------------------ */
+    function openSettingsModal(){
+      const pref = getPaymentPeriodPref();
+      const radios = document.querySelectorAll('input[name="paymentPeriod"]');
+      if(radios && radios.length){
+        Array.from(radios).forEach(r=> r.checked = (r.value === pref));
+      }
+      const note = document.getElementById('current-period-note');
+      if(note) note.textContent = `Preferencia actual: ${pref === 'weekly' ? 'Pago semanal' : 'Pago quincenal'}`;
+
+      // populate upcoming controls
+      const uc = document.getElementById('upcoming-count');
+      const ui = document.getElementById('upcoming-include');
+      const ua = document.getElementById('upcoming-alert-days');
+      if(uc) uc.value = getUpcomingCount();
+      if(ui) ui.checked = getUpcomingInclude();
+      if(ua) ua.value = getUpcomingAlertDays();
+
+      showModal('settings-modal');
+    }
+
+    const navHome = document.getElementById('nav-home');
+    if(navHome) navHome.onclick = () => activateNav('home');
+    const navAccounts = document.getElementById('nav-accounts');
+    if(navAccounts) navAccounts.onclick = () => activateNav('accounts');
+    const navTransactions = document.getElementById('nav-transactions');
+    if(navTransactions) navTransactions.onclick = () => activateNav('transactions');
+    const navSettings = document.getElementById('nav-settings');
+    if(navSettings) navSettings.onclick = () => openSettingsModal();
+
+    function activateNav(section){
+      document.querySelectorAll('.bottom-nav .nav-item').forEach(i=>i.classList.remove('active'));
+      const el = document.getElementById('nav-'+section);
+      if(el) el.classList.add('active');
+      if(section==='accounts') document.getElementById('accounts-section').scrollIntoView({behavior:'smooth'});
+      else if(section==='transactions') document.getElementById('transactions-section').scrollIntoView({behavior:'smooth'});
+      else if(section==='home') window.scrollTo({top:0,behavior:'smooth'});
+    }
+  </script>
+</body>
+</html>
