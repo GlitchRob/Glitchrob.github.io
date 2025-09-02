@@ -16,7 +16,10 @@
             box-shadow: 0 10px 20px -3px rgba(59, 130, 246, 0.4), 0 4px 6px -2px rgba(59, 130, 246, 0.3);
         }
         .grid-poster img { aspect-ratio: 2 / 3; object-fit: cover; }
-        .video-container { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%; background: #000; border-radius: 0.5rem; }
+        .video-container { 
+            position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; 
+            max-width: 100%; background: #000; border-radius: 0.5rem; 
+        }
         .video-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
         .input-field, .search-field { background-color: #374151; border-color: #4b5563; }
         .btn-primary { background-color: #3b82f6; }
@@ -180,7 +183,7 @@
         let searchTerm = '';
         const itemsPerPage = 30;
 
-        // --- Gestión de Datos (LocalStorage) ---
+        // --- Gestión de Datos (LocalStorage) --- (sin cambios)
         const saveConfigs = () => localStorage.setItem('scraperConfigs', JSON.stringify(configurations));
         const loadConfigs = () => {
             configurations = JSON.parse(localStorage.getItem('scraperConfigs')) || [];
@@ -196,7 +199,7 @@
             displayGrid();
         }
         
-        // --- Gestión de Modales ---
+        // --- Gestión de Modales --- (sin cambios)
         const openModal = (modal) => {
             modal.classList.remove('hidden');
             setTimeout(() => {
@@ -210,26 +213,20 @@
             setTimeout(() => modal.classList.add('hidden'), 300);
         };
 
-        // --- Lógica de la Galería, Paginación y Búsqueda ---
+        // --- Lógica de la Galería, Paginación y Búsqueda --- (sin cambios)
         function setupPagination(filteredData) {
             paginationControls.innerHTML = '';
             const totalPages = Math.ceil(filteredData.length / itemsPerPage);
             if (totalPages <= 1) return;
-
             const createBtn = (text, page, isDisabled = false, isActive = false) => {
                 const btn = doc.createElement('button');
                 btn.innerHTML = text;
                 btn.disabled = isDisabled;
                 btn.className = `pagination-btn py-2 px-4 rounded-md text-sm font-semibold ${isActive ? 'active' : ''}`;
-                btn.addEventListener('click', () => {
-                    currentPage = page;
-                    displayGrid();
-                });
+                btn.addEventListener('click', () => { currentPage = page; displayGrid(); });
                 return btn;
             };
-
             paginationControls.appendChild(createBtn('&laquo; Ant', currentPage - 1, currentPage === 1));
-            // Simple pagination display logic for brevity
             for (let i = 1; i <= totalPages; i++) {
                 if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
                     paginationControls.appendChild(createBtn(i, i, false, i === currentPage));
@@ -245,22 +242,16 @@
 
         function displayGrid() {
             gridOutput.innerHTML = '';
-            
-            const filteredData = searchTerm
-                ? currentScrapedData.filter(item => item.nombre?.toLowerCase().includes(searchTerm))
-                : currentScrapedData;
-
+            const filteredData = searchTerm ? currentScrapedData.filter(item => item.nombre?.toLowerCase().includes(searchTerm)) : currentScrapedData;
             if (!filteredData || filteredData.length === 0) {
                 gridOutput.innerHTML = `<p class="col-span-full text-center text-gray-500">${searchTerm ? 'No se encontraron resultados para tu búsqueda.' : 'No hay datos. Abre la configuración para empezar a extraer.'}</p>`;
                 catalogSubtitle.textContent = searchTerm ? `0 resultados para "${searchTerm}"` : "0 elementos encontrados.";
                 setupPagination([]);
                 return;
             }
-
             const startIndex = (currentPage - 1) * itemsPerPage;
             const endIndex = startIndex + itemsPerPage;
             const paginatedItems = filteredData.slice(startIndex, endIndex);
-
             paginatedItems.forEach(item => {
                 if (!item.nombre || !item.imagen) return;
                 const poster = doc.createElement('div');
@@ -269,11 +260,11 @@
                 poster.addEventListener('click', () => showItemDetails(item));
                 gridOutput.appendChild(poster);
             });
-            
             catalogSubtitle.textContent = `Mostrando ${paginatedItems.length} de ${filteredData.length} resultados. (Total: ${currentScrapedData.length} en catálogo)`;
             setupPagination(filteredData);
         }
-
+        
+        // --- LÓGICA DE DETALLES MEJORADA ---
         function showItemDetails(item) {
             modalTitle.textContent = item.nombre;
             openModal(detailsModal);
@@ -303,7 +294,10 @@
                     const parser = new DOMParser();
                     const detailDoc = parser.parseFromString(html, 'text/html');
                     const iframe = detailDoc.querySelector('#video-content iframe');
-                    const videoEl = iframe ? `<div class="video-container mb-4"><iframe src="${iframe.src}" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe></div>` : `<p class="text-center text-red-400 mb-4">No se encontró video en la página de detalles.</p>`;
+                    const sandboxPermissions = "allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-popups allow-popups-to-escape-sandbox";
+                    const videoEl = iframe 
+                        ? `<div class="video-container mb-4"><iframe src="${iframe.src}" sandbox="${sandboxPermissions}" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe></div>` 
+                        : `<p class="text-center text-red-400 mb-4">No se encontró video en la página de detalles.</p>`;
                     finalizeModal(videoEl);
                 }).catch((error) => {
                     console.error("Error fetching details:", error);
@@ -311,7 +305,7 @@
                 });
         }
 
-        // --- Lógica del Scraper ---
+        // --- Lógica del Scraper --- (sin cambios)
         const populateConfigDropdown = () => {
             configSelect.innerHTML = '<option value="new">-- Crear Nueva Configuración --</option>';
             configurations.forEach(config => {
@@ -321,7 +315,6 @@
                 configSelect.appendChild(option);
             });
         };
-
         const clearForm = () => {
             currentConfigId = null;
             configNameInput.value = '';
@@ -336,7 +329,6 @@
             deleteBtn.disabled = true;
             configSelect.value = 'new';
         };
-
         const loadConfigIntoForm = (id) => {
             const config = configurations.find(c => c.id === id);
             if (!config) return clearForm();
@@ -350,7 +342,6 @@
             config.fields.forEach(f => createField(f.key, f.selector, f.attribute));
             deleteBtn.disabled = false;
         };
-
         const createField = (key='', selector='', attribute='') => {
             const fieldNode = fieldTemplate.content.cloneNode(true);
             fieldNode.querySelector('.field-key').value = key;
@@ -358,9 +349,7 @@
             fieldNode.querySelector('.field-attribute').value = attribute;
             fieldsContainer.appendChild(fieldNode);
         };
-
         configSelect.addEventListener('change', () => loadConfigIntoForm(configSelect.value));
-        
         saveBtn.addEventListener('click', () => {
             const name = configNameInput.value.trim();
             if (!name) return alert('Por favor, asigna un nombre a la configuración.');
@@ -376,11 +365,10 @@
                     attribute: item.querySelector('.field-attribute').value.trim()
                 })).filter(f => f.key && f.selector)
             };
-
-            if (currentConfigId) { // Update existing
+            if (currentConfigId) {
                 const index = configurations.findIndex(c => c.id === currentConfigId);
                 configurations[index] = { ...configurations[index], ...configData };
-            } else { // Create new
+            } else {
                 const newConfig = { id: `config_${Date.now()}`, ...configData };
                 configurations.push(newConfig);
                 currentConfigId = newConfig.id;
@@ -391,7 +379,6 @@
             deleteBtn.disabled = false;
             alert(`Configuración "${name}" guardada.`);
         });
-
         deleteBtn.addEventListener('click', () => {
             if (!currentConfigId || !confirm(`¿Estás seguro de que quieres eliminar la configuración "${configNameInput.value}"?`)) return;
             configurations = configurations.filter(c => c.id !== currentConfigId);
@@ -399,39 +386,32 @@
             populateConfigDropdown();
             clearForm();
         });
-
         extractBtn.addEventListener('click', async () => {
             const baseUrl = urlInput.value.trim();
             const containerSelector = containerSelectorInput.value.trim();
             const configName = configNameInput.value.trim() || 'Extracción sin título';
             const pageCount = parseInt(pageCountInput.value, 10) || 1;
             const paginationPattern = paginationPatternInput.value.trim();
-
             if (!baseUrl || !containerSelector) return alert('URL y Selector de Contenedor son requeridos.');
-            
             const fields = Array.from(doc.querySelectorAll('.field-item')).map(item => ({
                 key: item.querySelector('.field-key').value.trim(),
                 selector: item.querySelector('.field-selector').value.trim(),
                 attribute: item.querySelector('.field-attribute').value.trim()
             })).filter(f => f.key && f.selector);
-
             loader.classList.remove('hidden');
             extractBtn.disabled = true;
-
             try {
                 const urlsToFetch = [baseUrl];
                 for (let i = 2; i <= pageCount; i++) {
                     urlsToFetch.push(`${baseUrl}${paginationPattern}${i}`);
                 }
-
                 const proxyUrl = 'https://api.allorigins.win/raw?url=';
                 const allResponses = await Promise.all(urlsToFetch.map(url => fetch(proxyUrl + encodeURIComponent(url))));
-                
                 let allScrapedData = [];
                 for (const response of allResponses) {
                     if (!response.ok) {
                         console.warn(`Falló la petición para una de las páginas: ${response.statusText}`);
-                        continue; // Skip failed requests
+                        continue; 
                     }
                     const html = await response.text();
                     const docParser = new DOMParser();
@@ -452,7 +432,6 @@
                     });
                     allScrapedData = allScrapedData.concat(pageData);
                 }
-                
                 searchInput.value = ''; 
                 searchTerm = '';
                 currentScrapedData = allScrapedData;
@@ -460,7 +439,6 @@
                 saveLastScrapedData(currentScrapedData, configName);
                 loadLastScrapedData();
                 closeModal(scraperModal);
-
             } catch (error) {
                 alert(`Ocurrió un error durante la extracción: ${error.message}`);
             } finally {
@@ -472,10 +450,9 @@
         // --- Eventos de UI y Carga Inicial ---
         searchInput.addEventListener('input', (e) => {
             searchTerm = e.target.value.toLowerCase();
-            currentPage = 1; // Resetear a la primera página con cada búsqueda
+            currentPage = 1;
             displayGrid();
         });
-
         openScraperBtn.addEventListener('click', () => openModal(scraperModal));
         closeScraperBtn.addEventListener('click', () => closeModal(scraperModal));
         closeDetailsBtn.addEventListener('click', () => closeModal(detailsModal));
@@ -483,7 +460,6 @@
         fieldsContainer.addEventListener('click', e => {
             if (e.target.closest('.remove-field-btn')) e.target.closest('.field-item').remove();
         });
-
         // Carga Inicial de la Aplicación
         loadConfigs();
         populateConfigDropdown();
@@ -493,3 +469,19 @@
     </script>
 </body>
 </html>
+```
+
+### El Cambio Específico
+
+He modificado la línea que genera el `<iframe>` dentro de la función `showItemDetails` para usar una lista de permisos más completa y segura.
+
+* **Antes:**
+    ```javascript
+    const videoEl = iframe ? `<div class="video-container mb-4"><iframe src="${iframe.src}" sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock" ...></iframe></div>` : ...
+    ```
+* **Ahora:**
+    ```javascript
+    const sandboxPermissions = "allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-popups allow-popups-to-escape-sandbox";
+    const videoEl = iframe ? `<div class="video-container mb-4"><iframe src="${iframe.src}" sandbox="${sandboxPermissions}" ...></iframe></div>` : ...
+    
+
