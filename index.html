@@ -348,7 +348,7 @@
                     } else if (episodeLinks.length > 0) {
                         renderEpisodeList(episodeLinks, item, genres, description);
                     } else {
-                        renderVideoPlayer(item, genres, description); // Intenta encontrar un iframe estático como última opción
+                        renderVideoPlayer(item, genres, description);
                     }
                 }).catch(error => {
                     console.error("Error fetching details:", error);
@@ -451,8 +451,30 @@
         }
 
         // --- Lógica del Scraper y Combinación ---
-        const populateConfigDropdown = () => { /* ... */ };
-        const populateCombineList = () => { /* ... */ };
+        const populateConfigDropdown = () => {
+            configSelect.innerHTML = '<option value="new">-- Crear/Editar Configuración --</option>';
+            configurations.forEach(config => {
+                const option = doc.createElement('option');
+                option.value = config.id;
+                option.textContent = config.name;
+                configSelect.appendChild(option);
+            });
+        };
+        const populateCombineList = () => {
+            combineListContainer.innerHTML = '';
+            if (configurations.length === 0) {
+                combineListContainer.innerHTML = `<p class="text-sm text-gray-400">Guarda al menos una configuración para poder combinarla.</p>`;
+                combineBtn.disabled = true;
+                return;
+            }
+            configurations.forEach(config => {
+                const div = doc.createElement('div');
+                div.className = 'flex items-center bg-gray-700 p-2 rounded-md';
+                div.innerHTML = `<input id="combine-${config.id}" data-config-id="${config.id}" type="checkbox" class="combine-checkbox h-4 w-4 rounded bg-gray-600 border-gray-500 text-blue-500 focus:ring-blue-500"><label for="combine-${config.id}" class="ml-2 block text-sm font-medium text-gray-200 truncate">${config.name}</label>`;
+                combineListContainer.appendChild(div);
+            });
+            combineBtn.disabled = false;
+        };
         const clearForm = () => {
             currentConfigId = null;
             configNameInput.value = ''; urlInput.value = ''; containerSelectorInput.value = '';
@@ -540,13 +562,66 @@
             }
             return configResults;
         };
-        combineBtn.addEventListener('click', async () => { /* ... */ });
-        extractBtn.addEventListener('click', async () => { /* ... */ });
+        combineBtn.addEventListener('click', async () => {
+            const selectedConfigs = Array.from(doc.querySelectorAll('.combine-checkbox:checked')).map(cb => configurations.find(c => c.id === cb.dataset.configId)).filter(Boolean);
+            if (selectedConfigs.length === 0) return alert('Selecciona al menos una configuración para combinar.');
+            loader.classList.remove('hidden');
+            combineBtn.disabled = true; extractBtn.disabled = true;
+            let allScrapedData = [];
+            for (let i = 0; i < selectedConfigs.length; i++) {
+                const config = selectedConfigs[i];
+                loaderText.textContent = `Extrayendo de "${config.name}" (${i+1}/${selectedConfigs.length})...`;
+                const results = await performScrape(config);
+                allScrapedData = allScrapedData.concat(results);
+            }
+            const uniqueData = Array.from(new Map(allScrapedData.map(item => [item.nombre, item])).values());
+            searchInput.value = ''; searchTerm = '';
+            currentScrapedData = uniqueData;
+            currentPage = 1; 
+            saveLastScrapedData(currentScrapedData, 'Catálogo Combinado', true);
+            loadLastScrapedData();
+            loader.classList.add('hidden'); loaderText.textContent = '';
+            combineBtn.disabled = false; extractBtn.disabled = false;
+            closeModal(scraperModal);
+        });
+        extractBtn.addEventListener('click', async () => {
+            const configName = configNameInput.value.trim() || 'Extracción sin título';
+            const currentFormData = {
+                name: configName,
+                url: urlInput.value.trim(),
+                containerSelector: containerSelectorInput.value.trim(),
+                pageCount: parseInt(pageCountInput.value, 10) || 1,
+                paginationPattern: paginationPatternInput.value.trim(),
+                genreSelector: genreSelectorInput.value.trim(),
+                descriptionSelector: descriptionSelectorInput.value.trim(),
+                videoSelector: videoSelectorInput.value.trim(),
+                fields: Array.from(doc.querySelectorAll('.field-item')).map(item => ({ key: item.querySelector('.field-key').value.trim(), selector: item.querySelector('.field-selector').value.trim(), attribute: item.querySelector('.field-attribute').value.trim() })).filter(f => f.key && f.selector)
+            };
+            if(currentConfigId) currentFormData.id = currentConfigId;
+            loader.classList.remove('hidden');
+            loaderText.textContent = `Extrayendo de "${configName}"...`;
+            combineBtn.disabled = true; extractBtn.disabled = true;
+            const scrapedData = await performScrape(currentFormData);
+            searchInput.value = ''; searchTerm = '';
+            currentScrapedData = scrapedData;
+            currentPage = 1; 
+            saveLastScrapedData(currentScrapedData, configName, false);
+            loadLastScrapedData();
+            loader.classList.add('hidden'); loaderText.textContent = '';
+            combineBtn.disabled = false; extractBtn.disabled = false;
+            closeModal(scraperModal);
+        });
         
         // --- Eventos de UI y Carga Inicial ---
         configSelect.addEventListener('change', () => loadConfigIntoForm(configSelect.value));
-        deleteBtn.addEventListener('click', () => { /* ... */ });
-        searchInput.addEventListener('input', (e) => { /* ... */ });
+        deleteBtn.addEventListener('click', () => {
+            if (!currentConfigId || !confirm(`¿Estás seguro de que quieres eliminar la configuración "${configNameInput.value}"?`)) return;
+            configurations = configurations.filter(c => c.id !== currentConfigId);
+            saveConfigs();
+            populateConfigDropdown();
+            clearForm();
+        });
+        searchInput.addEventListener('input', (e) => { searchTerm = e.target.value.toLowerCase(); currentPage = 1; displayGrid(); });
         openScraperBtn.addEventListener('click', () => { populateCombineList(); openModal(scraperModal); });
         closeScraperBtn.addEventListener('click', () => closeModal(scraperModal));
         closeDetailsBtn.addEventListener('click', () => closeModal(detailsModal));
