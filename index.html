@@ -90,8 +90,12 @@
                             <input type="text" id="config-name" class="input-field w-full p-2 rounded-md" placeholder="Ej: Películas de Estreno">
                         </div>
                         <div>
-                            <label for="url" class="block text-sm font-medium text-gray-300 mb-1">URL (Página 1)</label>
+                            <label for="url" class="block text-sm font-medium text-gray-300 mb-1">URL de Listado (Página 1)</label>
                             <input type="url" id="url" class="input-field w-full p-2 rounded-md" placeholder="https://ejemplo.com/listado">
+                        </div>
+                         <div>
+                            <label for="search-url" class="block text-sm font-medium text-gray-300 mb-1">URL de Búsqueda</label>
+                            <input type="url" id="search-url" class="input-field w-full p-2 rounded-md" placeholder="https://ejemplo.com/search?q=">
                         </div>
                         <div>
                             <label for="containerSelector" class="block text-sm font-medium text-gray-300 mb-1">Selector de Contenedor</label>
@@ -161,13 +165,14 @@
             <div class="flex-1">
                 <h1 id="catalog-title" class="text-4xl sm:text-5xl font-bold text-white">Mi Catálogo Web</h1>
                 <p id="catalog-subtitle" class="text-gray-400 mt-2">Contenido extraído de la web.</p>
+                <button id="back-to-catalog-btn" class="hidden mt-2 text-sm text-blue-400 hover:underline">&larr; Volver al catálogo completo</button>
             </div>
             <div class="flex items-center gap-4 w-full sm:w-auto">
                 <div class="relative flex-1 sm:flex-auto">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                         <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                    </div>
-                    <input type="text" id="search-input" class="search-field w-full pl-10 pr-4 py-2 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Buscar en el catálogo...">
+                    <input type="text" id="search-input" class="search-field w-full pl-4 pr-10 py-2 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Buscar...">
+                    <button id="search-web-btn" class="absolute inset-y-0 right-0 px-3 flex items-center text-gray-400 hover:text-blue-400" title="Buscar en la Web">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    </button>
                 </div>
                 <button id="open-scraper-modal-btn" class="btn-secondary p-3 rounded-lg" title="Configuración y Combinación">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
@@ -192,7 +197,7 @@
     <script>
     document.addEventListener('DOMContentLoaded', () => {
         const doc = document;
-        const PROXY_URL = 'https://corsproxy.io/?'; // Centralized proxy URL
+        const PROXY_URL = 'https://corsproxy.io/?'; 
 
         // Elementos de UI
         const gridOutput = doc.getElementById('grid-output');
@@ -200,6 +205,8 @@
         const catalogTitle = doc.getElementById('catalog-title');
         const catalogSubtitle = doc.getElementById('catalog-subtitle');
         const searchInput = doc.getElementById('search-input');
+        const searchWebBtn = doc.getElementById('search-web-btn');
+        const backToCatalogBtn = doc.getElementById('back-to-catalog-btn');
         // Modales
         const scraperModal = doc.getElementById('scraper-modal');
         const detailsModal = doc.getElementById('details-modal');
@@ -213,6 +220,7 @@
         const configSelect = doc.getElementById('config-select');
         const configNameInput = doc.getElementById('config-name');
         const urlInput = doc.getElementById('url');
+        const searchUrlInput = doc.getElementById('search-url');
         const containerSelectorInput = doc.getElementById('containerSelector');
         const pageCountInput = doc.getElementById('page-count');
         const paginationPatternInput = doc.getElementById('pagination-pattern');
@@ -234,6 +242,7 @@
         // Estado de la aplicación
         let configurations = [];
         let currentConfigId = null;
+        let originalScrapedData = [];
         let currentScrapedData = [];
         let currentPage = 1;
         let searchTerm = '';
@@ -242,16 +251,23 @@
         // --- Gestión de Datos y Modales ---
         const saveConfigs = () => localStorage.setItem('scraperConfigs', JSON.stringify(configurations));
         const loadConfigs = () => configurations = JSON.parse(localStorage.getItem('scraperConfigs')) || [];
-        const saveLastScrapedData = (data, configName, isCombined = false) => {
+        const saveLastScrapedData = (data, configId, isCombined = false) => {
             localStorage.setItem('lastScrapedData', JSON.stringify(data));
-            localStorage.setItem('lastScrapedConfigName', configName);
+            localStorage.setItem('lastScrapedConfigId', configId);
             localStorage.setItem('lastViewWasCombined', isCombined);
         };
         const loadLastScrapedData = () => {
             currentScrapedData = JSON.parse(localStorage.getItem('lastScrapedData')) || [];
-            let configName = localStorage.getItem('lastScrapedConfigName') || 'Mi Catálogo Web';
+            originalScrapedData = [...currentScrapedData];
+            let configId = localStorage.getItem('lastScrapedConfigId');
             const isCombined = JSON.parse(localStorage.getItem('lastViewWasCombined')) || false;
-            if (isCombined) configName = 'Catálogo Combinado';
+            let configName = 'Mi Catálogo Web';
+            if (isCombined) {
+                configName = 'Catálogo Combinado';
+            } else if (configId) {
+                const config = configurations.find(c => c.id === configId);
+                if(config) configName = config.name;
+            }
             catalogTitle.textContent = configName;
             displayGrid();
         };
@@ -315,7 +331,7 @@
                 poster.addEventListener('click', () => showItemDetails(item));
                 gridOutput.appendChild(poster);
             });
-            catalogSubtitle.textContent = `Mostrando ${paginatedItems.length} de ${filteredData.length} resultados. (Total: ${currentScrapedData.length} en catálogo)`;
+            catalogSubtitle.textContent = `Mostrando ${paginatedItems.length} de ${filteredData.length} resultados. (Total: ${originalScrapedData.length} en catálogo)`;
             setupPagination(filteredData);
         }
 
@@ -329,7 +345,10 @@
                 return;
             }
             fetch(PROXY_URL + encodeURIComponent(item.url))
-                .then(res => res.ok ? res.text() : Promise.reject(new Error(`Error de red: ${res.statusText}`)))
+                .then(res => {
+                    if (!res.ok) throw new Error(`Error de red: ${res.statusText}`);
+                    return res.text();
+                })
                 .then(html => {
                     const parser = new DOMParser();
                     const detailDoc = parser.parseFromString(html, 'text/html');
@@ -354,7 +373,6 @@
                     renderNoContent(item, '', '', 'No se pudo cargar la página de detalles.');
                 });
         }
-        
         function findVideoInScript(detailDoc) {
             const scripts = detailDoc.querySelectorAll('script');
             const videoScript = Array.from(scripts).find(s => s.textContent.includes('var video = []'));
@@ -367,13 +385,11 @@
             }
             return null;
         }
-
         function renderVideoPlayer(item, genres, description) {
             const videoPlaceholderHTML = `<div id="video-placeholder-container" class="video-placeholder mb-4"><img src="${item.imagen}" alt="Póster de ${item.nombre}"><div class="play-button"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg></div></div>`;
             modalBody.innerHTML = videoPlaceholderHTML + renderItemInfo(item, genres, description);
             doc.getElementById('video-placeholder-container').addEventListener('click', () => loadVideo(item, doc.getElementById('video-placeholder-container')), { once: true });
         }
-        
         function renderEpisodeList(links, item, genres, description) {
             let episodeButtonsHTML = '';
             links.forEach(link => {
@@ -390,15 +406,12 @@
                 });
             });
         }
-        
         function renderNoContent(item, genres, description, message = 'No se encontró video ni lista de episodios.') {
              modalBody.innerHTML = `<p class="text-center text-red-400 mb-4">${message}</p>` + renderItemInfo(item, genres, description);
         }
-
         function renderItemInfo(item, genres = '', description = '') {
             return `<div class="flex gap-4 items-start mt-4"><img src="${item.imagen}" alt="Póster" class="w-24 sm:w-32 rounded-md shadow-lg"><div><h3 class="text-lg font-bold text-white">${item.nombre}</h3><a href="${item.url}" target="_blank" rel="noopener noreferrer" class="text-sm text-blue-400 hover:underline">Ver página original</a>${genres ? `<p class="text-sm text-gray-400 mt-2"><strong class="text-gray-300">Géneros:</strong> ${genres}</p>` : ''}</div></div>${description ? `<p class="text-sm text-gray-300 mt-4 border-t border-gray-700 pt-3">${description}</p>` : ''}`;
         }
-        
         function loadVideo(item, container) {
             container.innerHTML = `<div class="absolute inset-0 flex items-center justify-center"><div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-400"></div></div>`;
             if(item.customIframeSrc){
@@ -406,7 +419,10 @@
                 return;
             }
             fetch(PROXY_URL + encodeURIComponent(item.url))
-                .then(res => res.ok ? res.text() : Promise.reject(new Error(`Error de red: ${res.statusText}`)))
+                .then(res => {
+                    if (!res.ok) throw new Error(`Error de red: ${res.statusText}`);
+                    return res.text();
+                })
                 .then(html => {
                     const parser = new DOMParser();
                     const detailDoc = parser.parseFromString(html, 'text/html');
@@ -424,7 +440,6 @@
                     container.innerHTML = `<div class="absolute inset-0 flex items-center justify-center text-red-400">No se pudo cargar el video.</div>`;
                 });
         }
-        
         function renderIframe(src, container){
             const videoContainer = doc.createElement('div');
             videoContainer.className = 'video-container';
@@ -474,7 +489,7 @@
         };
         const clearForm = () => {
             currentConfigId = null;
-            configNameInput.value = ''; urlInput.value = ''; containerSelectorInput.value = '';
+            configNameInput.value = ''; urlInput.value = ''; searchUrlInput.value = ''; containerSelectorInput.value = '';
             pageCountInput.value = 1; paginationPatternInput.value = '';
             genreSelectorInput.value = ''; descriptionSelectorInput.value = '';
             videoSelectorInput.value = '#video-content iframe';
@@ -486,7 +501,8 @@
             const config = configurations.find(c => c.id === id);
             if (!config) return clearForm();
             currentConfigId = id;
-            configNameInput.value = config.name; urlInput.value = config.url; containerSelectorInput.value = config.containerSelector;
+            configNameInput.value = config.name; urlInput.value = config.url; searchUrlInput.value = config.searchUrl || '';
+            containerSelectorInput.value = config.containerSelector;
             pageCountInput.value = config.pageCount || 1; paginationPatternInput.value = config.paginationPattern || '';
             genreSelectorInput.value = config.genreSelector || ''; descriptionSelectorInput.value = config.descriptionSelector || '';
             videoSelectorInput.value = config.videoSelector || '#video-content iframe';
@@ -501,12 +517,59 @@
             fieldNode.querySelector('.field-attribute').value = attribute;
             fieldsContainer.appendChild(fieldNode);
         };
+        const performScrape = async (config, searchMode = false, searchTerm = '') => {
+            let { url: baseUrl, containerSelector, fields, pageCount, paginationPattern, searchUrl } = config;
+            if(searchMode){
+                const searchTermFormatted = searchTerm.replace(/ /g, '+');
+                baseUrl = `${searchUrl}${searchTermFormatted}`;
+                pageCount = 1;
+            }
+            if (!baseUrl || !containerSelector) return [];
+            const urlsToFetch = [baseUrl];
+            if (paginationPattern && !searchMode) { for (let i = 2; i <= pageCount; i++) urlsToFetch.push(`${baseUrl}${paginationPattern}${i}`); }
+            let configResults = [];
+            for (const url of urlsToFetch) {
+                 try {
+                    const response = await fetch(PROXY_URL + encodeURIComponent(url));
+                    if (!response.ok) { 
+                        console.warn(`Falló la petición para ${url}: ${response.statusText}`);
+                        alert(`Error: No se pudo acceder a ${url}. El sitio puede estar bloqueando el proxy. Intenta con otra configuración o más tarde.`);
+                        continue; 
+                    }
+                    const html = await response.text();
+                    const docParser = new DOMParser();
+                    const parsedDoc = docParser.parseFromString(html, 'text/html');
+                    const pageData = Array.from(parsedDoc.querySelectorAll(containerSelector)).map(item => {
+                        const extracted = { configId: config.id };
+                        fields.forEach(field => {
+                            const el = (field.selector.toLowerCase() === 'self') ? item : item.querySelector(field.selector);
+                            if(el) {
+                                let value = field.attribute ? (el.getAttribute(field.attribute) || '') : el.textContent.trim();
+                                if(field.key === 'url' && field.attribute === 'href' && value && !value.startsWith('http')) {
+                                    value = new URL(value, baseUrl).href;
+                                }
+                                extracted[field.key] = value;
+                            }
+                        });
+                        return extracted;
+                    });
+                    configResults = configResults.concat(pageData);
+                } catch (error) { 
+                    console.error(`Error extrayendo de ${url}:`, error);
+                    alert(`Ocurrió un error al procesar ${url}. Revisa la consola para más detalles.`);
+                }
+            }
+            return configResults;
+        };
+        
+        // --- Eventos de UI y Carga Inicial ---
         saveBtn.addEventListener('click', () => {
             const name = configNameInput.value.trim();
             if (!name) return alert('Por favor, asigna un nombre a la configuración.');
             const configData = {
                 name,
                 url: urlInput.value.trim(),
+                searchUrl: searchUrlInput.value.trim(),
                 containerSelector: containerSelectorInput.value.trim(),
                 pageCount: parseInt(pageCountInput.value, 10) || 1,
                 paginationPattern: paginationPatternInput.value.trim(),
@@ -526,38 +589,6 @@
             saveConfigs(); populateConfigDropdown(); configSelect.value = currentConfigId;
             deleteBtn.disabled = false; alert(`Configuración "${name}" guardada.`);
         });
-        const performScrape = async (config) => {
-            const { url: baseUrl, containerSelector, fields, pageCount, paginationPattern } = config;
-            if (!baseUrl || !containerSelector) return [];
-            const urlsToFetch = [baseUrl];
-            if (paginationPattern) { for (let i = 2; i <= pageCount; i++) urlsToFetch.push(`${baseUrl}${paginationPattern}${i}`); }
-            let configResults = [];
-            for (const url of urlsToFetch) {
-                 try {
-                    const response = await fetch(PROXY_URL + encodeURIComponent(url));
-                    if (!response.ok) { console.warn(`Falló la petición para ${url}: ${response.statusText}`); continue; }
-                    const html = await response.text();
-                    const docParser = new DOMParser();
-                    const parsedDoc = docParser.parseFromString(html, 'text/html');
-                    const pageData = Array.from(parsedDoc.querySelectorAll(containerSelector)).map(item => {
-                        const extracted = { configId: config.id };
-                        fields.forEach(field => {
-                            const el = (field.selector.toLowerCase() === 'self') ? item : item.querySelector(field.selector);
-                            if(el) {
-                                let value = field.attribute ? (el.getAttribute(field.attribute) || '') : el.textContent.trim();
-                                if(field.key === 'url' && field.attribute === 'href' && value && !value.startsWith('http')) {
-                                    value = new URL(value, baseUrl).href;
-                                }
-                                extracted[field.key] = value;
-                            }
-                        });
-                        return extracted;
-                    });
-                    configResults = configResults.concat(pageData);
-                } catch (error) { console.error(`Error extrayendo de ${url}:`, error); }
-            }
-            return configResults;
-        };
         combineBtn.addEventListener('click', async () => {
             const selectedConfigs = Array.from(doc.querySelectorAll('.combine-checkbox:checked')).map(cb => configurations.find(c => c.id === cb.dataset.configId)).filter(Boolean);
             if (selectedConfigs.length === 0) return alert('Selecciona al menos una configuración para combinar.');
@@ -574,7 +605,7 @@
             searchInput.value = ''; searchTerm = '';
             currentScrapedData = uniqueData;
             currentPage = 1; 
-            saveLastScrapedData(currentScrapedData, 'Catálogo Combinado', true);
+            saveLastScrapedData(uniqueData, 'Catálogo Combinado', true);
             loadLastScrapedData();
             loader.classList.add('hidden'); loaderText.textContent = '';
             combineBtn.disabled = false; extractBtn.disabled = false;
@@ -582,9 +613,11 @@
         });
         extractBtn.addEventListener('click', async () => {
             const configName = configNameInput.value.trim() || 'Extracción sin título';
+            const configId = currentConfigId || `config_${Date.now()}`;
             const currentFormData = {
-                name: configName,
+                id: configId, name: configName,
                 url: urlInput.value.trim(),
+                searchUrl: searchUrlInput.value.trim(),
                 containerSelector: containerSelectorInput.value.trim(),
                 pageCount: parseInt(pageCountInput.value, 10) || 1,
                 paginationPattern: paginationPatternInput.value.trim(),
@@ -593,22 +626,50 @@
                 videoSelector: videoSelectorInput.value.trim(),
                 fields: Array.from(doc.querySelectorAll('.field-item')).map(item => ({ key: item.querySelector('.field-key').value.trim(), selector: item.querySelector('.field-selector').value.trim(), attribute: item.querySelector('.field-attribute').value.trim() })).filter(f => f.key && f.selector)
             };
-            if(currentConfigId) currentFormData.id = currentConfigId;
             loader.classList.remove('hidden');
             loaderText.textContent = `Extrayendo de "${configName}"...`;
             combineBtn.disabled = true; extractBtn.disabled = true;
             const scrapedData = await performScrape(currentFormData);
+            
+            if (scrapedData.length === 0) {
+                 alert(`No se encontró contenido para "${configName}". Revisa los selectores o intenta más tarde.`);
+            }
+
             searchInput.value = ''; searchTerm = '';
             currentScrapedData = scrapedData;
             currentPage = 1; 
-            saveLastScrapedData(currentScrapedData, configName, false);
+            saveLastScrapedData(currentScrapedData, configId, false);
             loadLastScrapedData();
             loader.classList.add('hidden'); loaderText.textContent = '';
             combineBtn.disabled = false; extractBtn.disabled = false;
             closeModal(scraperModal);
         });
-        
-        // --- Eventos de UI y Carga Inicial ---
+        searchWebBtn.addEventListener('click', async () => {
+            const term = searchInput.value.trim();
+            if(!term) return alert('Por favor, introduce un término de búsqueda.');
+            const lastConfigId = localStorage.getItem('lastScrapedConfigId');
+            const isCombined = JSON.parse(localStorage.getItem('lastViewWasCombined'));
+            if(isCombined || !lastConfigId) return alert('La búsqueda web solo está disponible en catálogos individuales, no en vistas combinadas.');
+            const config = configurations.find(c => c.id === lastConfigId);
+            if(!config || !config.searchUrl) return alert('Esta configuración no tiene una URL de búsqueda definida.');
+            originalScrapedData = [...currentScrapedData];
+            loader.classList.remove('hidden');
+            loaderText.textContent = `Buscando "${term}"...`;
+            const searchResults = await performScrape(config, true, term);
+            currentScrapedData = searchResults;
+            currentPage = 1; searchTerm = ''; searchInput.value = '';
+            catalogTitle.textContent = `Resultados para: "${term}"`;
+            displayGrid();
+            loader.classList.add('hidden'); loaderText.textContent = '';
+            backToCatalogBtn.classList.remove('hidden');
+        });
+        backToCatalogBtn.addEventListener('click', () => {
+            currentScrapedData = [...originalScrapedData];
+            originalScrapedData = [];
+            searchInput.value = ''; searchTerm = '';
+            backToCatalogBtn.classList.add('hidden');
+            loadLastScrapedData();
+        });
         configSelect.addEventListener('change', () => loadConfigIntoForm(configSelect.value));
         deleteBtn.addEventListener('click', () => {
             if (!currentConfigId || !confirm(`¿Estás seguro de que quieres eliminar la configuración "${configNameInput.value}"?`)) return;
@@ -633,4 +694,3 @@
     </script>
 </body>
 </html>
-
