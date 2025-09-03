@@ -192,6 +192,8 @@
     <script>
     document.addEventListener('DOMContentLoaded', () => {
         const doc = document;
+        const PROXY_URL = 'https://corsproxy.io/?'; // Centralized proxy URL
+
         // Elementos de UI
         const gridOutput = doc.getElementById('grid-output');
         const paginationControls = doc.getElementById('pagination-controls');
@@ -326,8 +328,7 @@
                 modalBody.innerHTML = `<p class="text-center text-yellow-400">No hay URL de detalles para este elemento.</p>` + renderItemInfo(item);
                 return;
             }
-            const proxyUrl = 'https://api.allorigins.win/raw?url=';
-            fetch(proxyUrl + encodeURIComponent(item.url))
+            fetch(PROXY_URL + encodeURIComponent(item.url))
                 .then(res => res.ok ? res.text() : Promise.reject(new Error(`Error de red: ${res.statusText}`)))
                 .then(html => {
                     const parser = new DOMParser();
@@ -338,10 +339,8 @@
                         if (config.genreSelector) genres = Array.from(detailDoc.querySelectorAll(config.genreSelector)).map(el => el.textContent.trim()).join(', ');
                         if (config.descriptionSelector) description = detailDoc.querySelector(config.descriptionSelector)?.textContent.trim() || '';
                     }
-                    
                     const iframeSrcFromScript = findVideoInScript(detailDoc);
                     const episodeLinks = detailDoc.querySelectorAll('.tab-content a.btn');
-                    
                     if (iframeSrcFromScript) {
                          const tempItem = {...item, customIframeSrc: iframeSrcFromScript };
                          renderVideoPlayer(tempItem, genres, description);
@@ -364,9 +363,7 @@
                 const activeTabId = detailDoc.querySelector('.TbVideoNv li[data-id].active')?.dataset.id || '1';
                 const regex = new RegExp(`video\\[${activeTabId}\\]\\s*=\\s*'(.*?)'`, 'i');
                 const match = scriptContent.match(regex);
-                if (match && match[1]) {
-                    return match[1];
-                }
+                if (match && match[1]) return match[1];
             }
             return null;
         }
@@ -408,8 +405,7 @@
                 renderIframe(item.customIframeSrc, container);
                 return;
             }
-            const proxyUrl = 'https://api.allorigins.win/raw?url=';
-            fetch(proxyUrl + encodeURIComponent(item.url))
+            fetch(PROXY_URL + encodeURIComponent(item.url))
                 .then(res => res.ok ? res.text() : Promise.reject(new Error(`Error de red: ${res.statusText}`)))
                 .then(html => {
                     const parser = new DOMParser();
@@ -447,7 +443,8 @@
             });
             videoContainer.appendChild(iframeEl);
             videoContainer.appendChild(fullscreenBtn);
-            container.replaceWith(videoContainer);
+            container.innerHTML = '';
+            container.appendChild(videoContainer);
         }
 
         // --- Lógica del Scraper y Combinación ---
@@ -534,11 +531,10 @@
             if (!baseUrl || !containerSelector) return [];
             const urlsToFetch = [baseUrl];
             if (paginationPattern) { for (let i = 2; i <= pageCount; i++) urlsToFetch.push(`${baseUrl}${paginationPattern}${i}`); }
-            const proxyUrl = 'https://api.allorigins.win/raw?url=';
             let configResults = [];
             for (const url of urlsToFetch) {
                  try {
-                    const response = await fetch(proxyUrl + encodeURIComponent(url));
+                    const response = await fetch(PROXY_URL + encodeURIComponent(url));
                     if (!response.ok) { console.warn(`Falló la petición para ${url}: ${response.statusText}`); continue; }
                     const html = await response.text();
                     const docParser = new DOMParser();
