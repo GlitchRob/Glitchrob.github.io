@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scraper Pro con Búsqueda</title>
+    <title>Agregador de Contenido Web</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -16,11 +16,37 @@
             box-shadow: 0 10px 20px -3px rgba(59, 130, 246, 0.4), 0 4px 6px -2px rgba(59, 130, 246, 0.3);
         }
         .grid-poster img { aspect-ratio: 2 / 3; object-fit: cover; }
-        .video-container { 
+        .video-placeholder, .video-container { 
             position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; 
             max-width: 100%; background: #000; border-radius: 0.5rem; 
         }
+        .video-placeholder img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; filter: brightness(0.7); }
+        .video-placeholder .play-button {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 80px; height: 80px; background-color: rgba(0, 0, 0, 0.6);
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: background-color 0.2s, transform 0.2s;
+        }
+        .video-placeholder .play-button:hover { background-color: rgba(59, 130, 246, 0.8); transform: translate(-50%, -50%) scale(1.1); }
+        .video-placeholder .play-button svg { width: 40px; height: 40px; color: white; margin-left: 5px; }
         .video-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        .fullscreen-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 10;
+            background-color: rgba(0,0,0,0.5);
+            border-radius: 50%;
+            padding: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .fullscreen-btn:hover { background-color: rgba(59, 130, 246, 0.8); }
+        .fullscreen-btn svg { width: 20px; height: 20px; color: white; }
+        .episode-list { max-height: 200px; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+        .episode-btn { background-color: #374151; color: #d1d5db; text-align: center; padding: 10px; border-radius: 6px; transition: background-color 0.2s; cursor: pointer; }
+        .episode-btn:hover { background-color: #4b5563; }
+        .episode-btn.active { background-color: #3b82f6; color: white; font-weight: bold; }
         .input-field, .search-field { background-color: #374151; border-color: #4b5563; }
         .btn-primary { background-color: #3b82f6; }
         .btn-primary:hover { background-color: #2563eb; }
@@ -34,6 +60,509 @@
         .pagination-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     </style>
 </head>
+<body class="text-gray-200">
+
+    <!-- Modal para Scraper -->
+    <div id="scraper-modal" class="modal fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50 hidden opacity-0">
+        <div class="modal-content rounded-lg shadow-xl w-full max-w-4xl max-h-[95vh] flex flex-col transform scale-95">
+            <div class="flex justify-between items-center p-4 border-b border-gray-700">
+                <h2 class="text-xl font-bold text-white">Configuración y Combinación</h2>
+                <button id="close-scraper-modal-btn" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
+            </div>
+            <div class="p-6 overflow-y-auto flex-grow grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Columna de Combinación -->
+                <div class="lg:col-span-1 bg-gray-800 p-6 rounded-lg flex flex-col">
+                    <h3 class="text-lg font-semibold text-white mb-4">Combinar Catálogos</h3>
+                    <div id="combine-list-container" class="flex-grow space-y-3 overflow-y-auto pr-2">
+                        <p class="text-sm text-gray-400">Guarda configuraciones para poder combinarlas.</p>
+                    </div>
+                    <button id="combine-btn" class="btn-primary w-full font-bold py-2 px-6 rounded-md mt-4 disabled:opacity-50 disabled:cursor-not-allowed">Combinar y Extraer</button>
+                </div>
+                <!-- Columna de Configuración Individual -->
+                <div class="lg:col-span-2 bg-gray-800 p-6 rounded-lg">
+                    <div class="mb-4">
+                        <label for="config-select" class="block text-sm font-medium text-gray-300 mb-2">Gestor de Configuraciones Individuales</label>
+                        <select id="config-select" class="input-field w-full p-2.5 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"></select>
+                    </div>
+                    <div class="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
+                         <div>
+                            <label for="config-name" class="block text-sm font-medium text-gray-300 mb-1">Nombre</label>
+                            <input type="text" id="config-name" class="input-field w-full p-2 rounded-md" placeholder="Ej: Películas de Estreno">
+                        </div>
+                        <div>
+                            <label for="url" class="block text-sm font-medium text-gray-300 mb-1">URL (Página 1)</label>
+                            <input type="url" id="url" class="input-field w-full p-2 rounded-md" placeholder="https://ejemplo.com/listado">
+                        </div>
+                        <div>
+                            <label for="containerSelector" class="block text-sm font-medium text-gray-300 mb-1">Selector de Contenedor</label>
+                            <input type="text" id="containerSelector" class="input-field w-full p-2 rounded-md" placeholder=".item-card">
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                             <div>
+                                <label for="page-count" class="block text-sm font-medium text-gray-300 mb-1">Nº Páginas</label>
+                                <input type="number" id="page-count" class="input-field w-full p-2 rounded-md" value="1" min="1">
+                            </div>
+                            <div>
+                                <label for="pagination-pattern" class="block text-sm font-medium text-gray-300 mb-1">Patrón Paginación</label>
+                                <input type="text" id="pagination-pattern" class="input-field w-full p-2 rounded-md" placeholder="/page/">
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center pt-2">
+                            <h3 class="text-md font-semibold text-white">Campos a Extraer (del listado)</h3>
+                            <button id="add-field-btn" class="btn-secondary text-sm font-semibold py-1 px-2 rounded-md">Añadir</button>
+                        </div>
+                        <div id="fields-container" class="space-y-2"></div>
+                         <div class="pt-3 border-t border-gray-700 space-y-3">
+                            <h3 class="text-md font-semibold text-white">Selectores de Página de Detalles (Opcional)</h3>
+                            <div>
+                                <label for="genre-selector" class="block text-sm font-medium text-gray-300 mb-1">Selector de Géneros</label>
+                                <input type="text" id="genre-selector" class="input-field w-full p-2 rounded-md" placeholder="div.genres a">
+                            </div>
+                            <div>
+                                <label for="description-selector" class="block text-sm font-medium text-gray-300 mb-1">Selector de Descripción</label>
+                                <input type="text" id="description-selector" class="input-field w-full p-2 rounded-md" placeholder=".description p">
+                            </div>
+                             <div>
+                                <label for="video-selector" class="block text-sm font-medium text-gray-300 mb-1">Selector de Video (iframe)</label>
+                                <input type="text" id="video-selector" class="input-field w-full p-2 rounded-md" placeholder="#video-content iframe">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-between items-center p-4 border-t border-gray-700 mt-auto bg-gray-800 rounded-b-lg">
+                <div>
+                     <button id="delete-btn" class="btn-danger text-sm font-semibold py-2 px-4 rounded-md disabled:opacity-50 disabled:cursor-not-allowed">Eliminar</button>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div id="loader" class="hidden"><div class="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-blue-400"></div></div>
+                    <span id="loader-text" class="text-sm text-gray-400"></span>
+                    <button id="save-btn" class="btn-secondary text-sm font-semibold py-2 px-4 rounded-md">Guardar</button>
+                    <button id="extract-btn" class="btn-primary font-bold py-2 px-6 rounded-md">Extraer Solo Esta</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal para Detalles -->
+    <div id="details-modal" class="modal fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50 hidden opacity-0">
+         <div class="modal-content rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col transform scale-95">
+            <div class="flex justify-between items-center p-4 border-b border-gray-700">
+                <h2 id="modal-title" class="text-xl font-bold text-white truncate"></h2>
+                <button id="close-details-modal-btn" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
+            </div>
+            <div id="modal-body" class="p-4 sm:p-6 overflow-y-auto"></div>
+        </div>
+    </div>
+
+    <!-- Contenido Principal -->
+    <div class="container mx-auto p-4 max-w-7xl">
+        <header class="flex flex-col sm:flex-row justify-between sm:items-center my-8 gap-6">
+            <div class="flex-1">
+                <h1 id="catalog-title" class="text-4xl sm:text-5xl font-bold text-white">Mi Catálogo Web</h1>
+                <p id="catalog-subtitle" class="text-gray-400 mt-2">Contenido extraído de la web.</p>
+            </div>
+            <div class="flex items-center gap-4 w-full sm:w-auto">
+                <div class="relative flex-1 sm:flex-auto">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                         <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    </div>
+                    <input type="text" id="search-input" class="search-field w-full pl-10 pr-4 py-2 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Buscar en el catálogo...">
+                </div>
+                <button id="open-scraper-modal-btn" class="btn-secondary p-3 rounded-lg" title="Configuración y Combinación">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                </button>
+            </div>
+        </header>
+        <main>
+            <div id="grid-output" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6"></div>
+        </main>
+        <nav id="pagination-controls" class="flex justify-center items-center space-x-2 mt-8 py-4"></nav>
+    </div>
+    
+    <template id="field-template">
+        <div class="field-item grid grid-cols-12 gap-2 items-center">
+            <input type="text" class="field-key input-field col-span-3 p-2 rounded-md text-sm" placeholder="Nombre">
+            <input type="text" class="field-selector input-field col-span-5 p-2 rounded-md text-sm" placeholder="Selector">
+            <input type="text" class="field-attribute input-field col-span-3 p-2 rounded-md text-sm" placeholder="Atributo">
+            <button class="remove-field-btn btn-danger p-2 rounded-md col-span-1 flex justify-center items-center font-bold">&times;</button>
+        </div>
+    </template>
+    
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const doc = document;
+        // Elementos de UI
+        const gridOutput = doc.getElementById('grid-output');
+        const paginationControls = doc.getElementById('pagination-controls');
+        const catalogTitle = doc.getElementById('catalog-title');
+        const catalogSubtitle = doc.getElementById('catalog-subtitle');
+        const searchInput = doc.getElementById('search-input');
+        // Modales
+        const scraperModal = doc.getElementById('scraper-modal');
+        const detailsModal = doc.getElementById('details-modal');
+        const openScraperBtn = doc.getElementById('open-scraper-modal-btn');
+        const closeScraperBtn = doc.getElementById('close-scraper-modal-btn');
+        const closeDetailsBtn = doc.getElementById('close-details-modal-btn');
+        // Contenido Modales
+        const modalTitle = doc.getElementById('modal-title');
+        const modalBody = doc.getElementById('modal-body');
+        // Formulario Scraper
+        const configSelect = doc.getElementById('config-select');
+        const configNameInput = doc.getElementById('config-name');
+        const urlInput = doc.getElementById('url');
+        const containerSelectorInput = doc.getElementById('containerSelector');
+        const pageCountInput = doc.getElementById('page-count');
+        const paginationPatternInput = doc.getElementById('pagination-pattern');
+        const fieldsContainer = doc.getElementById('fields-container');
+        const addFieldBtn = doc.getElementById('add-field-btn');
+        const saveBtn = doc.getElementById('save-btn');
+        const deleteBtn = doc.getElementById('delete-btn');
+        const extractBtn = doc.getElementById('extract-btn');
+        const loader = doc.getElementById('loader');
+        const loaderText = doc.getElementById('loader-text');
+        const fieldTemplate = doc.getElementById('field-template');
+        const genreSelectorInput = doc.getElementById('genre-selector');
+        const descriptionSelectorInput = doc.getElementById('description-selector');
+        const videoSelectorInput = doc.getElementById('video-selector');
+        // Combinación
+        const combineBtn = doc.getElementById('combine-btn');
+        const combineListContainer = doc.getElementById('combine-list-container');
+
+        // Estado de la aplicación
+        let configurations = [];
+        let currentConfigId = null;
+        let currentScrapedData = [];
+        let currentPage = 1;
+        let searchTerm = '';
+        const itemsPerPage = 30;
+
+        // --- Gestión de Datos y Modales ---
+        const saveConfigs = () => localStorage.setItem('scraperConfigs', JSON.stringify(configurations));
+        const loadConfigs = () => configurations = JSON.parse(localStorage.getItem('scraperConfigs')) || [];
+        const saveLastScrapedData = (data, configName, isCombined = false) => {
+            localStorage.setItem('lastScrapedData', JSON.stringify(data));
+            localStorage.setItem('lastScrapedConfigName', configName);
+            localStorage.setItem('lastViewWasCombined', isCombined);
+        };
+        const loadLastScrapedData = () => {
+            currentScrapedData = JSON.parse(localStorage.getItem('lastScrapedData')) || [];
+            let configName = localStorage.getItem('lastScrapedConfigName') || 'Mi Catálogo Web';
+            const isCombined = JSON.parse(localStorage.getItem('lastViewWasCombined')) || false;
+            if (isCombined) configName = 'Catálogo Combinado';
+            catalogTitle.textContent = configName;
+            displayGrid();
+        };
+        const openModal = (modal) => {
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.add('opacity-100');
+                modal.querySelector('.modal-content').classList.add('scale-100');
+            }, 10);
+        };
+        const closeModal = (modal) => {
+            modal.classList.remove('opacity-100');
+            modal.querySelector('.modal-content').classList.remove('scale-100');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        };
+        
+        // --- Lógica de la Galería, Paginación y Búsqueda ---
+        function setupPagination(filteredData) {
+            paginationControls.innerHTML = '';
+            const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+            if (totalPages <= 1) return;
+            const createBtn = (text, page, isDisabled = false, isActive = false) => {
+                const btn = doc.createElement('button');
+                btn.innerHTML = text;
+                btn.disabled = isDisabled;
+                btn.className = `pagination-btn py-2 px-4 rounded-md text-sm font-semibold ${isActive ? 'active' : ''}`;
+                btn.addEventListener('click', () => { currentPage = page; displayGrid(); });
+                return btn;
+            };
+            paginationControls.appendChild(createBtn('&laquo; Ant', currentPage - 1, currentPage === 1));
+            for (let i = 1; i <= totalPages; i++) {
+                if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
+                    paginationControls.appendChild(createBtn(i, i, false, i === currentPage));
+                } else if (i === currentPage - 2 || i === currentPage + 2) {
+                    const dots = doc.createElement('span');
+                    dots.textContent = '...';
+                    dots.className = 'px-2 text-gray-500';
+                    paginationControls.appendChild(dots);
+                }
+            }
+            paginationControls.appendChild(createBtn('Sig &raquo;', currentPage + 1, currentPage === totalPages));
+        }
+
+        function displayGrid() {
+            gridOutput.innerHTML = '';
+            const filteredData = searchTerm ? currentScrapedData.filter(item => item.nombre?.toLowerCase().includes(searchTerm)) : currentScrapedData;
+            if (!filteredData || filteredData.length === 0) {
+                gridOutput.innerHTML = `<p class="col-span-full text-center text-gray-500">${searchTerm ? 'No se encontraron resultados para tu búsqueda.' : 'No hay datos. Abre la configuración para empezar a extraer.'}</p>`;
+                catalogSubtitle.textContent = searchTerm ? `0 resultados para "${searchTerm}"` : "0 elementos encontrados.";
+                setupPagination([]);
+                return;
+            }
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const endIndex = startIndex + itemsPerPage;
+            const paginatedItems = filteredData.slice(startIndex, endIndex);
+            paginatedItems.forEach(item => {
+                if (!item.nombre || !item.imagen) return;
+                const poster = doc.createElement('div');
+                poster.className = 'grid-poster group block rounded-lg overflow-hidden cursor-pointer';
+                poster.innerHTML = `<img src="${item.imagen}" alt="${item.nombre}" class="w-full h-auto object-cover"><div class="p-2"><h4 class="text-sm font-semibold text-white truncate">${item.nombre}</h4></div>`;
+                poster.addEventListener('click', () => showItemDetails(item));
+                gridOutput.appendChild(poster);
+            });
+            catalogSubtitle.textContent = `Mostrando ${paginatedItems.length} de ${filteredData.length} resultados. (Total: ${currentScrapedData.length} en catálogo)`;
+            setupPagination(filteredData);
+        }
+
+        // --- Lógica de Detalles Mejorada ---
+        function showItemDetails(item) {
+            modalTitle.textContent = item.nombre;
+            openModal(detailsModal);
+            modalBody.innerHTML = `<div class="text-center"><div class="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-400"></div><p class="mt-2">Analizando contenido...</p></div>`;
+            if (!item.url) {
+                modalBody.innerHTML = `<p class="text-center text-yellow-400">No hay URL de detalles para este elemento.</p>` + renderItemInfo(item);
+                return;
+            }
+            const proxyUrl = 'https://api.allorigins.win/raw?url=';
+            fetch(proxyUrl + encodeURIComponent(item.url))
+                .then(res => res.ok ? res.text() : Promise.reject(new Error(`Error de red: ${res.statusText}`)))
+                .then(html => {
+                    const parser = new DOMParser();
+                    const detailDoc = parser.parseFromString(html, 'text/html');
+                    const config = configurations.find(c => c.id === item.configId);
+                    let genres = '', description = '';
+                    if (config) {
+                        if (config.genreSelector) genres = Array.from(detailDoc.querySelectorAll(config.genreSelector)).map(el => el.textContent.trim()).join(', ');
+                        if (config.descriptionSelector) description = detailDoc.querySelector(config.descriptionSelector)?.textContent.trim() || '';
+                    }
+                    
+                    const iframeSrcFromScript = findVideoInScript(detailDoc);
+                    const episodeLinks = detailDoc.querySelectorAll('.tab-content a.btn');
+                    
+                    if (iframeSrcFromScript) {
+                         const tempItem = {...item, customIframeSrc: iframeSrcFromScript };
+                         renderVideoPlayer(tempItem, genres, description);
+                    } else if (episodeLinks.length > 0) {
+                        renderEpisodeList(episodeLinks, item, genres, description);
+                    } else {
+                        renderVideoPlayer(item, genres, description); // Intenta encontrar un iframe estático como última opción
+                    }
+                }).catch(error => {
+                    console.error("Error fetching details:", error);
+                    renderNoContent(item, '', '', 'No se pudo cargar la página de detalles.');
+                });
+        }
+        
+        function findVideoInScript(detailDoc) {
+            const scripts = detailDoc.querySelectorAll('script');
+            const videoScript = Array.from(scripts).find(s => s.textContent.includes('var video = []'));
+            if (videoScript) {
+                const scriptContent = videoScript.textContent;
+                const activeTabId = detailDoc.querySelector('.TbVideoNv li[data-id].active')?.dataset.id || '1';
+                const regex = new RegExp(`video\\[${activeTabId}\\]\\s*=\\s*'(.*?)'`, 'i');
+                const match = scriptContent.match(regex);
+                if (match && match[1]) {
+                    return match[1];
+                }
+            }
+            return null;
+        }
+
+        function renderVideoPlayer(item, genres, description) {
+            const videoPlaceholderHTML = `<div id="video-placeholder-container" class="video-placeholder mb-4"><img src="${item.imagen}" alt="Póster de ${item.nombre}"><div class="play-button"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg></div></div>`;
+            modalBody.innerHTML = videoPlaceholderHTML + renderItemInfo(item, genres, description);
+            doc.getElementById('video-placeholder-container').addEventListener('click', () => loadVideo(item, doc.getElementById('video-placeholder-container')), { once: true });
+        }
+        
+        function renderEpisodeList(links, item, genres, description) {
+            let episodeButtonsHTML = '';
+            links.forEach(link => {
+                episodeButtonsHTML += `<button class="episode-btn" data-href="${link.href}">${link.textContent.trim()}</button>`;
+            });
+            modalBody.innerHTML = `<div id="video-display-area" class="mb-4"><p class="text-center text-gray-400 p-8">Selecciona un episodio para cargarlo.</p></div><h3 class="text-md font-semibold text-white mb-2">Episodios</h3><div class="episode-list mb-4">${episodeButtonsHTML}</div>` + renderItemInfo(item, genres, description);
+            doc.querySelectorAll('.episode-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    doc.querySelectorAll('.episode-btn.active').forEach(b => b.classList.remove('active'));
+                    e.currentTarget.classList.add('active');
+                    const videoArea = doc.getElementById('video-display-area');
+                    const episodeItem = { ...item, url: e.currentTarget.dataset.href };
+                    loadVideo(episodeItem, videoArea);
+                });
+            });
+        }
+        
+        function renderNoContent(item, genres, description, message = 'No se encontró video ni lista de episodios.') {
+             modalBody.innerHTML = `<p class="text-center text-red-400 mb-4">${message}</p>` + renderItemInfo(item, genres, description);
+        }
+
+        function renderItemInfo(item, genres = '', description = '') {
+            return `<div class="flex gap-4 items-start mt-4"><img src="${item.imagen}" alt="Póster" class="w-24 sm:w-32 rounded-md shadow-lg"><div><h3 class="text-lg font-bold text-white">${item.nombre}</h3><a href="${item.url}" target="_blank" rel="noopener noreferrer" class="text-sm text-blue-400 hover:underline">Ver página original</a>${genres ? `<p class="text-sm text-gray-400 mt-2"><strong class="text-gray-300">Géneros:</strong> ${genres}</p>` : ''}</div></div>${description ? `<p class="text-sm text-gray-300 mt-4 border-t border-gray-700 pt-3">${description}</p>` : ''}`;
+        }
+        
+        function loadVideo(item, container) {
+            container.innerHTML = `<div class="absolute inset-0 flex items-center justify-center"><div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-400"></div></div>`;
+            if(item.customIframeSrc){
+                renderIframe(item.customIframeSrc, container);
+                return;
+            }
+            const proxyUrl = 'https://api.allorigins.win/raw?url=';
+            fetch(proxyUrl + encodeURIComponent(item.url))
+                .then(res => res.ok ? res.text() : Promise.reject(new Error(`Error de red: ${res.statusText}`)))
+                .then(html => {
+                    const parser = new DOMParser();
+                    const detailDoc = parser.parseFromString(html, 'text/html');
+                    let iframeSrc = findVideoInScript(detailDoc);
+                    if (!iframeSrc) {
+                        const config = configurations.find(c => c.id === item.configId);
+                        const videoSelector = config?.videoSelector || '#video-content iframe';
+                        const iframe = detailDoc.querySelector(videoSelector);
+                        if(iframe && iframe.src) iframeSrc = iframe.src;
+                    }
+                    if (iframeSrc) renderIframe(iframeSrc, container);
+                    else container.innerHTML = `<div class="absolute inset-0 flex items-center justify-center text-red-400">No se encontró video en esta página.</div>`;
+                }).catch(error => {
+                    console.error("Error loading video:", error);
+                    container.innerHTML = `<div class="absolute inset-0 flex items-center justify-center text-red-400">No se pudo cargar el video.</div>`;
+                });
+        }
+        
+        function renderIframe(src, container){
+            const videoContainer = doc.createElement('div');
+            videoContainer.className = 'video-container';
+            const iframeEl = doc.createElement('iframe');
+            iframeEl.src = src;
+            iframeEl.setAttribute('frameborder', '0');
+            iframeEl.setAttribute('allow', 'autoplay; encrypted-media; fullscreen');
+            iframeEl.setAttribute('allowfullscreen', '');
+            const fullscreenBtn = doc.createElement('button');
+            fullscreenBtn.className = 'fullscreen-btn';
+            fullscreenBtn.title = 'Ver en Pantalla Completa';
+            fullscreenBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>`;
+            fullscreenBtn.addEventListener('click', () => {
+                if (videoContainer.requestFullscreen) videoContainer.requestFullscreen();
+                else if (videoContainer.webkitRequestFullscreen) videoContainer.webkitRequestFullscreen();
+            });
+            videoContainer.appendChild(iframeEl);
+            videoContainer.appendChild(fullscreenBtn);
+            container.replaceWith(videoContainer);
+        }
+
+        // --- Lógica del Scraper y Combinación ---
+        const populateConfigDropdown = () => { /* ... */ };
+        const populateCombineList = () => { /* ... */ };
+        const clearForm = () => {
+            currentConfigId = null;
+            configNameInput.value = ''; urlInput.value = ''; containerSelectorInput.value = '';
+            pageCountInput.value = 1; paginationPatternInput.value = '';
+            genreSelectorInput.value = ''; descriptionSelectorInput.value = '';
+            videoSelectorInput.value = '#video-content iframe';
+            fieldsContainer.innerHTML = '';
+            createField('nombre', 'p', ''); createField('imagen', 'img', 'src'); createField('url', 'self', 'href');
+            deleteBtn.disabled = true; configSelect.value = 'new';
+        };
+        const loadConfigIntoForm = (id) => {
+            const config = configurations.find(c => c.id === id);
+            if (!config) return clearForm();
+            currentConfigId = id;
+            configNameInput.value = config.name; urlInput.value = config.url; containerSelectorInput.value = config.containerSelector;
+            pageCountInput.value = config.pageCount || 1; paginationPatternInput.value = config.paginationPattern || '';
+            genreSelectorInput.value = config.genreSelector || ''; descriptionSelectorInput.value = config.descriptionSelector || '';
+            videoSelectorInput.value = config.videoSelector || '#video-content iframe';
+            fieldsContainer.innerHTML = '';
+            (config.fields || []).forEach(f => createField(f.key, f.selector, f.attribute));
+            deleteBtn.disabled = false;
+        };
+        const createField = (key='', selector='', attribute='') => {
+            const fieldNode = fieldTemplate.content.cloneNode(true);
+            fieldNode.querySelector('.field-key').value = key;
+            fieldNode.querySelector('.field-selector').value = selector;
+            fieldNode.querySelector('.field-attribute').value = attribute;
+            fieldsContainer.appendChild(fieldNode);
+        };
+        saveBtn.addEventListener('click', () => {
+            const name = configNameInput.value.trim();
+            if (!name) return alert('Por favor, asigna un nombre a la configuración.');
+            const configData = {
+                name,
+                url: urlInput.value.trim(),
+                containerSelector: containerSelectorInput.value.trim(),
+                pageCount: parseInt(pageCountInput.value, 10) || 1,
+                paginationPattern: paginationPatternInput.value.trim(),
+                genreSelector: genreSelectorInput.value.trim(),
+                descriptionSelector: descriptionSelectorInput.value.trim(),
+                videoSelector: videoSelectorInput.value.trim(),
+                fields: Array.from(doc.querySelectorAll('.field-item')).map(item => ({ key: item.querySelector('.field-key').value.trim(), selector: item.querySelector('.field-selector').value.trim(), attribute: item.querySelector('.field-attribute').value.trim() })).filter(f => f.key && f.selector)
+            };
+            if (currentConfigId) {
+                const index = configurations.findIndex(c => c.id === currentConfigId);
+                configurations[index] = { ...configurations[index], ...configData };
+            } else {
+                const newConfig = { id: `config_${Date.now()}`, ...configData };
+                configurations.push(newConfig);
+                currentConfigId = newConfig.id;
+            }
+            saveConfigs(); populateConfigDropdown(); configSelect.value = currentConfigId;
+            deleteBtn.disabled = false; alert(`Configuración "${name}" guardada.`);
+        });
+        const performScrape = async (config) => {
+            const { url: baseUrl, containerSelector, fields, pageCount, paginationPattern } = config;
+            if (!baseUrl || !containerSelector) return [];
+            const urlsToFetch = [baseUrl];
+            if (paginationPattern) { for (let i = 2; i <= pageCount; i++) urlsToFetch.push(`${baseUrl}${paginationPattern}${i}`); }
+            const proxyUrl = 'https://api.allorigins.win/raw?url=';
+            let configResults = [];
+            for (const url of urlsToFetch) {
+                 try {
+                    const response = await fetch(proxyUrl + encodeURIComponent(url));
+                    if (!response.ok) { console.warn(`Falló la petición para ${url}: ${response.statusText}`); continue; }
+                    const html = await response.text();
+                    const docParser = new DOMParser();
+                    const parsedDoc = docParser.parseFromString(html, 'text/html');
+                    const pageData = Array.from(parsedDoc.querySelectorAll(containerSelector)).map(item => {
+                        const extracted = { configId: config.id };
+                        fields.forEach(field => {
+                            const el = (field.selector.toLowerCase() === 'self') ? item : item.querySelector(field.selector);
+                            if(el) {
+                                let value = field.attribute ? (el.getAttribute(field.attribute) || '') : el.textContent.trim();
+                                if(field.key === 'url' && field.attribute === 'href' && value && !value.startsWith('http')) {
+                                    value = new URL(value, baseUrl).href;
+                                }
+                                extracted[field.key] = value;
+                            }
+                        });
+                        return extracted;
+                    });
+                    configResults = configResults.concat(pageData);
+                } catch (error) { console.error(`Error extrayendo de ${url}:`, error); }
+            }
+            return configResults;
+        };
+        combineBtn.addEventListener('click', async () => { /* ... */ });
+        extractBtn.addEventListener('click', async () => { /* ... */ });
+        
+        // --- Eventos de UI y Carga Inicial ---
+        configSelect.addEventListener('change', () => loadConfigIntoForm(configSelect.value));
+        deleteBtn.addEventListener('click', () => { /* ... */ });
+        searchInput.addEventListener('input', (e) => { /* ... */ });
+        openScraperBtn.addEventListener('click', () => { populateCombineList(); openModal(scraperModal); });
+        closeScraperBtn.addEventListener('click', () => closeModal(scraperModal));
+        closeDetailsBtn.addEventListener('click', () => closeModal(detailsModal));
+        addFieldBtn.addEventListener('click', () => createField());
+        fieldsContainer.addEventListener('click', e => { if (e.target.closest('.remove-field-btn')) e.target.closest('.field-item').remove(); });
+        
+        // Carga Inicial
+        loadConfigs();
+        populateConfigDropdown();
+        clearForm();
+        loadLastScrapedData();
+    });
+    </script>
+</body>
+</html>
+
 <body class="text-gray-200">
 
     <!-- Modal para Scraper -->
