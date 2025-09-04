@@ -47,7 +47,7 @@
         .episode-btn { background-color: #374151; color: #d1d5db; text-align: center; padding: 10px; border-radius: 6px; transition: background-color 0.2s; cursor: pointer; }
         .episode-btn:hover { background-color: #4b5563; }
         .episode-btn.active { background-color: #3b82f6; color: white; font-weight: bold; }
-        .input-field, .search-field { background-color: #374151; border-color: #4b5563; }
+        .input-field, .search-field, .textarea-field { background-color: #374151; border-color: #4b5563; }
         .btn-primary { background-color: #3b82f6; }
         .btn-primary:hover { background-color: #2563eb; }
         .btn-secondary { background-color: #4b5563; }
@@ -58,6 +58,7 @@
         .pagination-btn:hover { background-color: #4b5563; }
         .pagination-btn.active { background-color: #3b82f6; color: white; font-weight: bold; }
         .pagination-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .icon-btn { transition: background-color 0.2s, color 0.2s; }
     </style>
 </head>
 <body class="text-gray-200">
@@ -97,6 +98,12 @@
                             <label for="search-url" class="block text-sm font-medium text-gray-300 mb-1">URL de Búsqueda</label>
                             <input type="url" id="search-url" class="input-field w-full p-2 rounded-md" placeholder="https://ejemplo.com/search?q=">
                         </div>
+                        <!-- INICIO: Nuevo campo para paginación de búsqueda -->
+                        <div>
+                            <label for="search-pagination-pattern" class="block text-sm font-medium text-gray-300 mb-1">Patrón Paginación de Búsqueda</label>
+                            <input type="text" id="search-pagination-pattern" class="input-field w-full p-2 rounded-md" placeholder="Ej: &page=">
+                        </div>
+                        <!-- FIN: Nuevo campo -->
                         <div>
                             <label for="containerSelector" class="block text-sm font-medium text-gray-300 mb-1">Selector de Contenedor</label>
                             <input type="text" id="containerSelector" class="input-field w-full p-2 rounded-md" placeholder=".item-card">
@@ -135,8 +142,19 @@
                 </div>
             </div>
             <div class="flex justify-between items-center p-4 border-t border-gray-700 mt-auto bg-gray-800 rounded-b-lg">
-                <div>
-                     <button id="delete-btn" class="btn-danger text-sm font-semibold py-2 px-4 rounded-md disabled:opacity-50 disabled:cursor-not-allowed">Eliminar</button>
+                <div class="flex items-center gap-2">
+                     <button id="import-json-btn" class="icon-btn btn-secondary p-2 rounded-lg" title="Importar configuración desde JSON">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                     </button>
+                     <button id="copy-json-btn" class="icon-btn btn-secondary p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" title="Copiar la configuración actual como texto JSON al portapapeles">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                     </button>
+                     <button id="copy-btn" class="icon-btn btn-secondary p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" title="Crear un duplicado de esta configuración">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2v-2"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 1a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V3a2 2 0 012-2h2"></path></svg>
+                     </button>
+                     <button id="delete-btn" class="icon-btn btn-danger p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" title="Eliminar permanentemente esta configuración">
+                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                     </button>
                 </div>
                 <div class="flex items-center gap-4">
                     <div id="loader" class="hidden"><div class="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-blue-400"></div></div>
@@ -148,6 +166,25 @@
         </div>
     </div>
     
+    <!-- Modal para Importar JSON -->
+    <div id="import-json-modal" class="modal fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50 hidden opacity-0">
+        <div class="modal-content rounded-lg shadow-xl w-full max-w-lg flex flex-col transform scale-95">
+            <div class="flex justify-between items-center p-4 border-b border-gray-700">
+                <h2 class="text-xl font-bold text-white">Importar Configuración desde JSON</h2>
+                <button id="close-import-modal-btn" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
+            </div>
+            <div class="p-6">
+                <label for="json-input" class="block text-sm font-medium text-gray-300 mb-2">Pega el código JSON de la configuración aquí:</label>
+                <textarea id="json-input" rows="10" class="textarea-field w-full p-2 rounded-md text-gray-200 focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder='{ "name": "Mi Config", "url": "https://...", ... }'></textarea>
+                <p id="import-error-msg" class="text-red-400 text-sm mt-2 h-4"></p>
+            </div>
+            <div class="flex justify-end items-center p-4 border-t border-gray-700 bg-gray-800 rounded-b-lg gap-4">
+                <button id="cancel-import-btn" class="btn-secondary text-sm font-semibold py-2 px-4 rounded-md">Cancelar</button>
+                <button id="confirm-import-btn" class="btn-primary font-bold py-2 px-6 rounded-md">Importar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal para Detalles -->
     <div id="details-modal" class="modal fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50 hidden opacity-0">
          <div class="modal-content rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col transform scale-95">
@@ -161,7 +198,7 @@
 
     <!-- Contenido Principal -->
     <div class="container mx-auto p-4 max-w-7xl">
-        <header class="flex flex-col sm:flex-row justify-between sm:items-center my-8 gap-6">
+        <header class="sticky top-0 z-40 bg-gray-900 flex flex-col sm:flex-row justify-between sm:items-center py-4 gap-6">
             <div class="flex-1">
                 <h1 id="catalog-title" class="text-4xl sm:text-5xl font-bold text-white">Mi Catálogo Web</h1>
                 <p id="catalog-subtitle" class="text-gray-400 mt-2">Contenido extraído de la web.</p>
@@ -175,11 +212,11 @@
                     </button>
                 </div>
                 <button id="open-scraper-modal-btn" class="btn-secondary p-3 rounded-lg" title="Configuración y Combinación">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0 3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                 </button>
             </div>
         </header>
-        <main>
+        <main class="mt-8">
             <div id="grid-output" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6"></div>
         </main>
         <nav id="pagination-controls" class="flex justify-center items-center space-x-2 mt-8 py-4"></nav>
@@ -210,9 +247,11 @@
         // Modales
         const scraperModal = doc.getElementById('scraper-modal');
         const detailsModal = doc.getElementById('details-modal');
+        const importJsonModal = doc.getElementById('import-json-modal');
         const openScraperBtn = doc.getElementById('open-scraper-modal-btn');
         const closeScraperBtn = doc.getElementById('close-scraper-modal-btn');
         const closeDetailsBtn = doc.getElementById('close-details-modal-btn');
+        const closeImportModalBtn = doc.getElementById('close-import-modal-btn');
         // Contenido Modales
         const modalTitle = doc.getElementById('modal-title');
         const modalBody = doc.getElementById('modal-body');
@@ -221,6 +260,7 @@
         const configNameInput = doc.getElementById('config-name');
         const urlInput = doc.getElementById('url');
         const searchUrlInput = doc.getElementById('search-url');
+        const searchPaginationPatternInput = doc.getElementById('search-pagination-pattern');
         const containerSelectorInput = doc.getElementById('containerSelector');
         const pageCountInput = doc.getElementById('page-count');
         const paginationPatternInput = doc.getElementById('pagination-pattern');
@@ -228,6 +268,9 @@
         const addFieldBtn = doc.getElementById('add-field-btn');
         const saveBtn = doc.getElementById('save-btn');
         const deleteBtn = doc.getElementById('delete-btn');
+        const copyBtn = doc.getElementById('copy-btn');
+        const copyJsonBtn = doc.getElementById('copy-json-btn');
+        const importJsonBtn = doc.getElementById('import-json-btn');
         const extractBtn = doc.getElementById('extract-btn');
         const loader = doc.getElementById('loader');
         const loaderText = doc.getElementById('loader-text');
@@ -238,6 +281,11 @@
         // Combinación
         const combineBtn = doc.getElementById('combine-btn');
         const combineListContainer = doc.getElementById('combine-list-container');
+        // Importación
+        const jsonInput = doc.getElementById('json-input');
+        const importErrorMsg = doc.getElementById('import-error-msg');
+        const cancelImportBtn = doc.getElementById('cancel-import-btn');
+        const confirmImportBtn = doc.getElementById('confirm-import-btn');
 
         // Estado de la aplicación
         let configurations = [];
@@ -489,19 +537,24 @@
         };
         const clearForm = () => {
             currentConfigId = null;
-            configNameInput.value = ''; urlInput.value = ''; searchUrlInput.value = ''; containerSelectorInput.value = '';
+            configNameInput.value = ''; urlInput.value = ''; searchUrlInput.value = '';
+            searchPaginationPatternInput.value = ''; containerSelectorInput.value = '';
             pageCountInput.value = 1; paginationPatternInput.value = '';
             genreSelectorInput.value = ''; descriptionSelectorInput.value = '';
             videoSelectorInput.value = '#video-content iframe';
             fieldsContainer.innerHTML = '';
             createField('nombre', 'p', ''); createField('imagen', 'img', 'src'); createField('url', 'self', 'href');
-            deleteBtn.disabled = true; configSelect.value = 'new';
+            deleteBtn.disabled = true; 
+            copyBtn.disabled = true;
+            copyJsonBtn.disabled = true;
+            configSelect.value = 'new';
         };
         const loadConfigIntoForm = (id) => {
             const config = configurations.find(c => c.id === id);
             if (!config) return clearForm();
             currentConfigId = id;
             configNameInput.value = config.name; urlInput.value = config.url; searchUrlInput.value = config.searchUrl || '';
+            searchPaginationPatternInput.value = config.searchPaginationPattern || '';
             containerSelectorInput.value = config.containerSelector;
             pageCountInput.value = config.pageCount || 1; paginationPatternInput.value = config.paginationPattern || '';
             genreSelectorInput.value = config.genreSelector || ''; descriptionSelectorInput.value = config.descriptionSelector || '';
@@ -509,6 +562,8 @@
             fieldsContainer.innerHTML = '';
             (config.fields || []).forEach(f => createField(f.key, f.selector, f.attribute));
             deleteBtn.disabled = false;
+            copyBtn.disabled = false;
+            copyJsonBtn.disabled = false;
         };
         const createField = (key='', selector='', attribute='') => {
             const fieldNode = fieldTemplate.content.cloneNode(true);
@@ -517,23 +572,59 @@
             fieldNode.querySelector('.field-attribute').value = attribute;
             fieldsContainer.appendChild(fieldNode);
         };
+
+        const copiarConfiguracion = () => {
+            if (!currentConfigId) return;
+            const originalName = configNameInput.value.trim();
+            const newName = `Copia de ${originalName || 'configuración sin nombre'}`;
+            const configData = {
+                name: newName, url: urlInput.value.trim(), searchUrl: searchUrlInput.value.trim(),
+                searchPaginationPattern: searchPaginationPatternInput.value.trim(),
+                containerSelector: containerSelectorInput.value.trim(), pageCount: parseInt(pageCountInput.value, 10) || 1,
+                paginationPattern: paginationPatternInput.value.trim(), genreSelector: genreSelectorInput.value.trim(),
+                descriptionSelector: descriptionSelectorInput.value.trim(), videoSelector: videoSelectorInput.value.trim(),
+                fields: Array.from(doc.querySelectorAll('.field-item')).map(item => ({ key: item.querySelector('.field-key').value.trim(), selector: item.querySelector('.field-selector').value.trim(), attribute: item.querySelector('.field-attribute').value.trim() })).filter(f => f.key && f.selector)
+            };
+            const newConfig = { id: `config_${Date.now()}`, ...configData };
+            configurations.push(newConfig);
+            saveConfigs(); populateConfigDropdown();
+            configSelect.value = newConfig.id;
+            loadConfigIntoForm(newConfig.id);
+        };
+
         const performScrape = async (config, searchMode = false, searchTerm = '') => {
-            let { url: baseUrl, containerSelector, fields, pageCount, paginationPattern, searchUrl } = config;
-            if(searchMode){
+            let { url, containerSelector, fields, pageCount, paginationPattern, searchUrl, searchPaginationPattern } = config;
+            
+            if (!containerSelector || (!url && !searchMode)) return [];
+            
+            const urlsToFetch = [];
+            let baseUrl = '';
+
+            if (searchMode) {
                 const searchTermFormatted = searchTerm.replace(/ /g, '+');
                 baseUrl = `${searchUrl}${searchTermFormatted}`;
-                pageCount = 1;
+                urlsToFetch.push(baseUrl);
+                if (searchPaginationPattern) {
+                    for (let i = 2; i <= pageCount; i++) {
+                        urlsToFetch.push(`${baseUrl}${searchPaginationPattern}${i}`);
+                    }
+                }
+            } else {
+                baseUrl = url;
+                urlsToFetch.push(baseUrl);
+                if (paginationPattern) {
+                    for (let i = 2; i <= pageCount; i++) {
+                        urlsToFetch.push(`${baseUrl}${paginationPattern}${i}`);
+                    }
+                }
             }
-            if (!baseUrl || !containerSelector) return [];
-            const urlsToFetch = [baseUrl];
-            if (paginationPattern && !searchMode) { for (let i = 2; i <= pageCount; i++) urlsToFetch.push(`${baseUrl}${paginationPattern}${i}`); }
+            
             let configResults = [];
-            for (const url of urlsToFetch) {
+            for (const currentUrl of urlsToFetch) {
                  try {
-                    const response = await fetch(PROXY_URL + encodeURIComponent(url));
+                    const response = await fetch(PROXY_URL + encodeURIComponent(currentUrl));
                     if (!response.ok) { 
-                        console.warn(`Falló la petición para ${url}: ${response.statusText}`);
-                        alert(`Error: No se pudo acceder a ${url}. El sitio puede estar bloqueando el proxy. Intenta con otra configuración o más tarde.`);
+                        console.warn(`Falló la petición para ${currentUrl}: ${response.statusText}`);
                         continue; 
                     }
                     const html = await response.text();
@@ -555,8 +646,7 @@
                     });
                     configResults = configResults.concat(pageData);
                 } catch (error) { 
-                    console.error(`Error extrayendo de ${url}:`, error);
-                    alert(`Ocurrió un error al procesar ${url}. Revisa la consola para más detalles.`);
+                    console.error(`Error extrayendo de ${currentUrl}:`, error);
                 }
             }
             return configResults;
@@ -565,17 +655,13 @@
         // --- Eventos de UI y Carga Inicial ---
         saveBtn.addEventListener('click', () => {
             const name = configNameInput.value.trim();
-            if (!name) return alert('Por favor, asigna un nombre a la configuración.');
+            if (!name) return;
             const configData = {
-                name,
-                url: urlInput.value.trim(),
-                searchUrl: searchUrlInput.value.trim(),
-                containerSelector: containerSelectorInput.value.trim(),
-                pageCount: parseInt(pageCountInput.value, 10) || 1,
-                paginationPattern: paginationPatternInput.value.trim(),
-                genreSelector: genreSelectorInput.value.trim(),
-                descriptionSelector: descriptionSelectorInput.value.trim(),
-                videoSelector: videoSelectorInput.value.trim(),
+                name, url: urlInput.value.trim(), searchUrl: searchUrlInput.value.trim(),
+                searchPaginationPattern: searchPaginationPatternInput.value.trim(),
+                containerSelector: containerSelectorInput.value.trim(), pageCount: parseInt(pageCountInput.value, 10) || 1,
+                paginationPattern: paginationPatternInput.value.trim(), genreSelector: genreSelectorInput.value.trim(),
+                descriptionSelector: descriptionSelectorInput.value.trim(), videoSelector: videoSelectorInput.value.trim(),
                 fields: Array.from(doc.querySelectorAll('.field-item')).map(item => ({ key: item.querySelector('.field-key').value.trim(), selector: item.querySelector('.field-selector').value.trim(), attribute: item.querySelector('.field-attribute').value.trim() })).filter(f => f.key && f.selector)
             };
             if (currentConfigId) {
@@ -587,11 +673,73 @@
                 currentConfigId = newConfig.id;
             }
             saveConfigs(); populateConfigDropdown(); configSelect.value = currentConfigId;
-            deleteBtn.disabled = false; alert(`Configuración "${name}" guardada.`);
+            deleteBtn.disabled = false; 
+            copyBtn.disabled = false;
+            copyJsonBtn.disabled = false;
         });
+        
+        copyJsonBtn.addEventListener('click', () => {
+            if (!currentConfigId && !configNameInput.value.trim()) return;
+            const configData = {
+                name: configNameInput.value.trim(), url: urlInput.value.trim(), searchUrl: searchUrlInput.value.trim(),
+                searchPaginationPattern: searchPaginationPatternInput.value.trim(),
+                containerSelector: containerSelectorInput.value.trim(), pageCount: parseInt(pageCountInput.value, 10) || 1,
+                paginationPattern: paginationPatternInput.value.trim(), genreSelector: genreSelectorInput.value.trim(),
+                descriptionSelector: descriptionSelectorInput.value.trim(), videoSelector: videoSelectorInput.value.trim(),
+                fields: Array.from(doc.querySelectorAll('.field-item')).map(item => ({ key: item.querySelector('.field-key').value.trim(), selector: item.querySelector('.field-selector').value.trim(), attribute: item.querySelector('.field-attribute').value.trim() })).filter(f => f.key && f.selector)
+            };
+            const jsonString = JSON.stringify(configData, null, 2);
+
+            const textArea = doc.createElement('textarea');
+            textArea.value = jsonString;
+            textArea.style.position = 'fixed'; textArea.style.top = '-9999px'; textArea.style.left = '-9999px';
+            doc.body.appendChild(textArea);
+            textArea.focus(); textArea.select();
+
+            try {
+                if (doc.execCommand('copy')) {
+                    const originalIcon = copyJsonBtn.innerHTML;
+                    const checkIcon = `<svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
+                    copyJsonBtn.innerHTML = checkIcon;
+                    setTimeout(() => { copyJsonBtn.innerHTML = originalIcon; }, 2000);
+                }
+            } catch (err) { console.error('Error al copiar al portapapeles: ', err); }
+            doc.body.removeChild(textArea);
+        });
+
+        confirmImportBtn.addEventListener('click', () => {
+            const jsonString = jsonInput.value.trim();
+            importErrorMsg.textContent = '';
+            if (!jsonString) {
+                importErrorMsg.textContent = 'El campo de texto está vacío.';
+                return;
+            }
+            try {
+                const importedData = JSON.parse(jsonString);
+                const requiredKeys = ['name', 'url', 'containerSelector', 'fields'];
+                const missingKeys = requiredKeys.filter(key => !(key in importedData));
+                if (missingKeys.length > 0) {
+                    importErrorMsg.textContent = `El JSON no es válido. Faltan las claves: ${missingKeys.join(', ')}.`;
+                    return;
+                }
+                const newConfig = { ...importedData, id: `config_${Date.now()}` };
+                configurations.push(newConfig);
+                saveConfigs();
+                populateConfigDropdown();
+                configSelect.value = newConfig.id;
+                loadConfigIntoForm(newConfig.id);
+                jsonInput.value = '';
+                importErrorMsg.textContent = '';
+                closeModal(importJsonModal);
+            } catch (error) {
+                importErrorMsg.textContent = 'El texto introducido no es un JSON válido.';
+                console.error("Error al parsear JSON:", error);
+            }
+        });
+
         combineBtn.addEventListener('click', async () => {
             const selectedConfigs = Array.from(doc.querySelectorAll('.combine-checkbox:checked')).map(cb => configurations.find(c => c.id === cb.dataset.configId)).filter(Boolean);
-            if (selectedConfigs.length === 0) return alert('Selecciona al menos una configuración para combinar.');
+            if (selectedConfigs.length === 0) return;
             loader.classList.remove('hidden');
             combineBtn.disabled = true; extractBtn.disabled = true;
             let allScrapedData = [];
@@ -616,14 +764,11 @@
             const configId = currentConfigId || `config_${Date.now()}`;
             const currentFormData = {
                 id: configId, name: configName,
-                url: urlInput.value.trim(),
-                searchUrl: searchUrlInput.value.trim(),
-                containerSelector: containerSelectorInput.value.trim(),
-                pageCount: parseInt(pageCountInput.value, 10) || 1,
-                paginationPattern: paginationPatternInput.value.trim(),
-                genreSelector: genreSelectorInput.value.trim(),
-                descriptionSelector: descriptionSelectorInput.value.trim(),
-                videoSelector: videoSelectorInput.value.trim(),
+                url: urlInput.value.trim(), searchUrl: searchUrlInput.value.trim(),
+                searchPaginationPattern: searchPaginationPatternInput.value.trim(),
+                containerSelector: containerSelectorInput.value.trim(), pageCount: parseInt(pageCountInput.value, 10) || 1,
+                paginationPattern: paginationPatternInput.value.trim(), genreSelector: genreSelectorInput.value.trim(),
+                descriptionSelector: descriptionSelectorInput.value.trim(), videoSelector: videoSelectorInput.value.trim(),
                 fields: Array.from(doc.querySelectorAll('.field-item')).map(item => ({ key: item.querySelector('.field-key').value.trim(), selector: item.querySelector('.field-selector').value.trim(), attribute: item.querySelector('.field-attribute').value.trim() })).filter(f => f.key && f.selector)
             };
             loader.classList.remove('hidden');
@@ -632,7 +777,7 @@
             const scrapedData = await performScrape(currentFormData);
             
             if (scrapedData.length === 0) {
-                 alert(`No se encontró contenido para "${configName}". Revisa los selectores o intenta más tarde.`);
+                 console.warn(`No se encontró contenido para "${configName}".`);
             }
 
             searchInput.value = ''; searchTerm = '';
@@ -646,12 +791,12 @@
         });
         searchWebBtn.addEventListener('click', async () => {
             const term = searchInput.value.trim();
-            if(!term) return alert('Por favor, introduce un término de búsqueda.');
+            if(!term) return;
             const lastConfigId = localStorage.getItem('lastScrapedConfigId');
             const isCombined = JSON.parse(localStorage.getItem('lastViewWasCombined'));
-            if(isCombined || !lastConfigId) return alert('La búsqueda web solo está disponible en catálogos individuales, no en vistas combinadas.');
+            if(isCombined || !lastConfigId) return;
             const config = configurations.find(c => c.id === lastConfigId);
-            if(!config || !config.searchUrl) return alert('Esta configuración no tiene una URL de búsqueda definida.');
+            if(!config || !config.searchUrl) return;
             originalScrapedData = [...currentScrapedData];
             loader.classList.remove('hidden');
             loaderText.textContent = `Buscando "${term}"...`;
@@ -678,6 +823,7 @@
             populateConfigDropdown();
             clearForm();
         });
+        copyBtn.addEventListener('click', copiarConfiguracion);
         searchInput.addEventListener('input', (e) => { searchTerm = e.target.value.toLowerCase(); currentPage = 1; displayGrid(); });
         openScraperBtn.addEventListener('click', () => { populateCombineList(); openModal(scraperModal); });
         closeScraperBtn.addEventListener('click', () => closeModal(scraperModal));
@@ -685,6 +831,12 @@
         addFieldBtn.addEventListener('click', () => createField());
         fieldsContainer.addEventListener('click', e => { if (e.target.closest('.remove-field-btn')) e.target.closest('.field-item').remove(); });
         
+        // Listeners para el modal de importación
+        importJsonBtn.addEventListener('click', () => openModal(importJsonModal));
+        closeImportModalBtn.addEventListener('click', () => closeModal(importJsonModal));
+        cancelImportBtn.addEventListener('click', () => closeModal(importJsonModal));
+
+
         // Carga Inicial
         loadConfigs();
         populateConfigDropdown();
