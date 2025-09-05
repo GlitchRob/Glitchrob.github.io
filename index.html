@@ -1,322 +1,1582 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Asistente de Mapa Personal</title>
-    
-    <!-- Tailwind CSS para un diseño moderno y responsivo -->
+    <title>Agregador de Contenido Web</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Leaflet.js para el mapa interactivo -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    
+    <!-- HLS.js para reproducir M3U8 -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Asegura que el mapa ocupe toda la pantalla */
-        html, body {
-            height: 100%;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            font-family: 'Inter', sans-serif;
+        body { font-family: 'Inter', sans-serif; background-color: #111827; }
+        .modal { transition: opacity 0.3s ease-in-out; }
+        .modal-content { transition: transform 0.3s ease-in-out; background-color: #1f2937; }
+        .grid-poster { 
+            position: relative;
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out; 
+            background-color: #1f2937; 
         }
-        #map {
-            height: 100vh;
-            width: 100vw;
-            z-index: 10;
+        .grid-poster:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 10px 20px -3px rgba(59, 130, 246, 0.4), 0 4px 6px -2px rgba(59, 130, 246, 0.3);
         }
-        /* Estilos para el panel de alertas y notificaciones */
-        .notification {
-            transition: transform 0.5s ease-in-out, opacity 0.5s ease-in-out;
-            transform: translateY(-200%);
-            opacity: 0;
+        .grid-poster img { aspect-ratio: 2 / 3; object-fit: cover; }
+        /* Estilos para el botón de reproducción superpuesto */
+        .play-overlay {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5); display: flex;
+            align-items: center; justify-content: center;
+            opacity: 0; transition: opacity 0.2s ease-in-out;
             pointer-events: none;
         }
-        .notification.show {
-            transform: translateY(0);
-            opacity: 1;
+        .grid-poster:hover .play-overlay { opacity: 1; }
+        .play-overlay svg { width: 60px; height: 60px; color: white; filter: drop-shadow(0 0 8px rgba(0, 0, 0, 0.7)); }
+        .favorite-btn-overlay {
+            position: absolute; top: 8px; right: 8px; z-index: 10;
+            background-color: rgba(0,0,0,0.5); border-radius: 50%;
+            padding: 6px; cursor: pointer; opacity: 0; 
+            transition: opacity 0.2s, color 0.2s;
+        }
+        .grid-poster:hover .favorite-btn-overlay { opacity: 1; }
+        .favorite-btn-overlay.favorited { opacity: 1; }
+        .favorite-btn-overlay svg, #modal-favorite-btn svg {
+            stroke: white; stroke-width: 1.5;
+            transition: color 0.2s, fill 0.2s;
+        }
+        .favorite-btn-overlay:hover svg, #modal-favorite-btn:hover svg { stroke: #ef4444; }
+        .favorite-btn-overlay.favorited svg, #modal-favorite-btn.favorited svg {
+            color: #ef4444; fill: #ef4444; stroke: #ef4444;
+        }
+        .new-episode-badge {
+            position: absolute; top: 8px; left: 8px;
+            background-color: #ef4444; color: white;
+            padding: 2px 8px; border-radius: 9999px;
+            font-size: 10px; font-weight: bold; z-index: 11;
+        }
+        #show-favorites-btn.active { background-color: #3b82f6; color: white; }
+        #show-favorites-btn.active svg { fill: white; }
+        .video-placeholder, .video-container { 
+            position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; 
+            max-width: 100%; background: #000; border-radius: 0.5rem; 
+        }
+        .video-placeholder img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; filter: brightness(0.7); }
+        .video-placeholder .play-button {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 80px; height: 80px; background-color: rgba(0, 0, 0, 0.6);
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: background-color 0.2s, transform 0.2s;
+        }
+        .video-placeholder .play-button:hover { background-color: rgba(59, 130, 246, 0.8); transform: translate(-50%, -50%) scale(1.1); }
+        .video-placeholder .play-button svg { width: 40px; height: 40px; color: white; margin-left: 5px; }
+        .video-container iframe, .video-container video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        .episode-list { max-height: 200px; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+        .episode-btn { background-color: #374151; color: #d1d5db; text-align: center; padding: 10px; border-radius: 6px; transition: background-color 0.2s; cursor: pointer; }
+        .episode-btn:hover { background-color: #4b5563; }
+        .episode-btn.active { background-color: #3b82f6; color: white; font-weight: bold; }
+        .input-field, .search-field, .textarea-field { background-color: #374151; border-color: #4b5563; }
+        .btn-primary { background-color: #3b82f6; }
+        .btn-primary:hover { background-color: #2563eb; }
+        .btn-secondary { background-color: #4b5563; }
+        .btn-secondary:hover { background-color: #6b7280; }
+        .btn-danger { background-color: #ef4444; }
+        .btn-danger:hover { background-color: #dc2626; }
+        .pagination-btn { background-color: #374151; transition: background-color 0.2s; }
+        .pagination-btn:hover { background-color: #4b5563; }
+        .pagination-btn.active { background-color: #3b82f6; color: white; font-weight: bold; }
+        .pagination-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .icon-btn { transition: background-color 0.2s, color 0.2s; }
+        /* Estilos para interruptores */
+        .toggle-checkbox:checked ~ .dot {
+            transform: translateX(100%);
+            background-color: #3b82f6;
+        }
+        .toggle-checkbox:checked ~ .toggle-bg {
+            background-color: #2563eb;
         }
     </style>
 </head>
-<body class="bg-gray-100">
+<body class="text-gray-200">
 
-    <!-- Contenedor principal del mapa -->
-    <div id="map"></div>
+    <!-- Modal para Scraper -->
+    <div id="scraper-modal" class="modal fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50 hidden opacity-0">
+        <div class="modal-content rounded-lg shadow-xl w-full max-w-4xl max-h-[95vh] flex flex-col transform scale-95">
+            <div class="flex justify-between items-center p-4 border-b border-gray-700">
+                <h2 class="text-xl font-bold text-white">Configuración y Combinación</h2>
+                <button id="close-scraper-modal-btn" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
+            </div>
+            <div class="p-6 overflow-y-auto flex-grow grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Columna de Combinación y Utilidades -->
+                <div class="lg:col-span-1 bg-gray-800 p-6 rounded-lg flex flex-col">
+                    <h3 class="text-lg font-semibold text-white mb-4">Combinar Catálogos</h3>
+                    <div id="combine-list-container" class="flex-grow space-y-3 overflow-y-auto pr-2">
+                        <p class="text-sm text-gray-400">Guarda configuraciones para poder combinarlas.</p>
+                    </div>
+                    <button id="combine-btn" class="btn-primary w-full font-bold py-2 px-6 rounded-md mt-4 disabled:opacity-50 disabled:cursor-not-allowed">Combinar y Extraer</button>
 
-    <!-- Panel de estado de geolocalización -->
-    <div id="geolocation-status-panel" class="hidden absolute top-0 left-0 right-0 z-20 bg-red-600 text-white p-4 text-center shadow-lg">
-        <p id="geolocation-status-text" class="font-semibold mb-2"></p>
-        <p id="geolocation-status-subtext" class="text-sm mb-3"></p>
-        <button id="retry-geolocation-btn" class="bg-white text-red-600 font-bold py-2 px-4 rounded-md hover:bg-red-100 transition-colors">Reintentar</button>
-    </div>
-
-    <!-- Panel flotante para la UI -->
-    <div id="ui-panel" class="absolute top-4 left-4 z-20 bg-white p-4 rounded-lg shadow-xl w-11/12 max-w-sm mt-0 transition-all duration-300">
-        <div class="flex justify-between items-center mb-3">
-            <h1 class="text-xl font-bold text-gray-800">Mis Alertas</h1>
-            <button id="toggle-help" class="p-2 rounded-full bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            </button>
-        </div>
-        <p id="help-text" class="text-sm text-gray-600 mb-4 hidden">Toca cualquier lugar en el mapa para agregar una nueva alerta. Las alertas activas se mostrarán aquí.</p>
-        <div id="alert-list-container" class="max-h-60 overflow-y-auto">
-            <p id="no-alerts-message" class="text-gray-500 text-center py-4">Aún no hay alertas.</p>
-            <ul id="alert-list" class="space-y-2">
-                <!-- Las alertas se insertarán aquí dinámicamente -->
-            </ul>
-        </div>
-    </div>
-
-    <!-- Modal para agregar una nueva alerta -->
-    <div id="add-alert-modal" class="hidden absolute inset-0 z-30 bg-black bg-opacity-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm">
-            <h2 class="text-lg font-bold mb-4">Nombrar Alerta</h2>
-            <p class="text-sm text-gray-600 mb-4">Dale un nombre a esta ubicación para identificarla fácilmente.</p>
-            <input type="text" id="alert-name-input" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ej: Casa, Oficina, Supermercado">
-            <div class="mt-6 flex justify-end space-x-3">
-                <button id="cancel-add-alert" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancelar</button>
-                <button id="confirm-add-alert" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Guardar</button>
+                    <!-- Sección de Utilidades -->
+                    <div class="mt-6 pt-4 border-t border-gray-700 space-y-4">
+                        <h3 class="text-lg font-semibold text-white">Utilidades</h3>
+                        <label for="adblock-toggle" class="flex items-center cursor-pointer">
+                            <div class="relative">
+                                <input type="checkbox" id="adblock-toggle" class="toggle-checkbox sr-only">
+                                <div class="toggle-bg block bg-gray-600 w-14 h-8 rounded-full"></div>
+                                <div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition"></div>
+                            </div>
+                            <div class="ml-3 text-gray-200 font-medium">Bloqueador de Publicidad</div>
+                        </label>
+                        <label for="popup-blocker-toggle" class="flex items-center cursor-pointer">
+                            <div class="relative">
+                                <input type="checkbox" id="popup-blocker-toggle" class="toggle-checkbox sr-only">
+                                <div class="toggle-bg block bg-gray-600 w-14 h-8 rounded-full"></div>
+                                <div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition"></div>
+                            </div>
+                            <div class="ml-3 text-gray-200 font-medium">Bloquear Pop-ups</div>
+                        </label>
+                        <label for="redirect-blocker-toggle" class="flex items-center cursor-pointer">
+                            <div class="relative">
+                                <input type="checkbox" id="redirect-blocker-toggle" class="toggle-checkbox sr-only">
+                                <div class="toggle-bg block bg-gray-600 w-14 h-8 rounded-full"></div>
+                                <div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition"></div>
+                            </div>
+                            <div class="ml-3 text-gray-200 font-medium">Bloquear Redirecciones</div>
+                        </label>
+                         <div class="space-y-2">
+                            <label for="auto-update-toggle" class="flex items-center cursor-pointer">
+                                <div class="relative">
+                                    <input type="checkbox" id="auto-update-toggle" class="toggle-checkbox sr-only">
+                                    <div class="toggle-bg block bg-gray-600 w-14 h-8 rounded-full"></div>
+                                    <div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition"></div>
+                                </div>
+                                <div class="ml-3 text-gray-200 font-medium">Actualización Automática</div>
+                            </label>
+                            <div class="flex items-center gap-2 pl-4">
+                                <input type="number" id="auto-update-interval" class="input-field w-20 p-2 rounded-md" min="1" placeholder="min">
+                                <span class="text-sm text-gray-400">minutos</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Columna de Configuración Individual -->
+                <div class="lg:col-span-2 bg-gray-800 p-6 rounded-lg">
+                    <div class="mb-4">
+                        <label for="config-select" class="block text-sm font-medium text-gray-300 mb-2">Gestor de Configuraciones Individuales</label>
+                        <select id="config-select" class="input-field w-full p-2.5 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"></select>
+                    </div>
+                    <div class="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
+                         <div>
+                            <label for="config-name" class="block text-sm font-medium text-gray-300 mb-1">Nombre</label>
+                            <input type="text" id="config-name" class="input-field w-full p-2 rounded-md" placeholder="Ej: Películas de Estreno">
+                        </div>
+                        <div>
+                            <label for="url" class="block text-sm font-medium text-gray-300 mb-1">URL de Listado (Página 1)</label>
+                            <input type="url" id="url" class="input-field w-full p-2 rounded-md" placeholder="https://ejemplo.com/listado">
+                        </div>
+                         <div>
+                            <label for="search-url" class="block text-sm font-medium text-gray-300 mb-1">URL de Búsqueda</label>
+                            <input type="url" id="search-url" class="input-field w-full p-2 rounded-md" placeholder="https://ejemplo.com/search?q=">
+                        </div>
+                        <div>
+                            <label for="search-pagination-pattern" class="block text-sm font-medium text-gray-300 mb-1">Patrón Paginación de Búsqueda</label>
+                            <input type="text" id="search-pagination-pattern" class="input-field w-full p-2 rounded-md" placeholder="Ej: &page=">
+                        </div>
+                        <div>
+                            <label for="containerSelector" class="block text-sm font-medium text-gray-300 mb-1">Selector de Contenedor</label>
+                            <input type="text" id="containerSelector" class="input-field w-full p-2 rounded-md" placeholder=".item-card">
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                             <div>
+                                <label for="page-count" class="block text-sm font-medium text-gray-300 mb-1">Nº Páginas</label>
+                                <input type="number" id="page-count" class="input-field w-full p-2 rounded-md" value="1" min="1">
+                            </div>
+                            <div>
+                                <label for="pagination-pattern" class="block text-sm font-medium text-gray-300 mb-1">Patrón Paginación</label>
+                                <input type="text" id="pagination-pattern" class="input-field w-full p-2 rounded-md" placeholder="/page/">
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center pt-2">
+                            <h3 class="text-md font-semibold text-white">Campos a Extraer (del listado)</h3>
+                            <button id="add-field-btn" class="btn-secondary text-sm font-semibold py-1 px-2 rounded-md">Añadir</button>
+                        </div>
+                        <div id="fields-container" class="space-y-2"></div>
+                         <div class="pt-3 border-t border-gray-700 space-y-3">
+                            <h3 class="text-md font-semibold text-white">Selectores de Página de Detalles (Opcional)</h3>
+                            <div>
+                                <label for="genre-selector" class="block text-sm font-medium text-gray-300 mb-1">Selector de Géneros</label>
+                                <input type="text" id="genre-selector" class="input-field w-full p-2 rounded-md" placeholder="div.genres a">
+                            </div>
+                            <div>
+                                <label for="description-selector" class="block text-sm font-medium text-gray-300 mb-1">Selector de Descripción</label>
+                                <input type="text" id="description-selector" class="input-field w-full p-2 rounded-md" placeholder=".description p">
+                            </div>
+                             <div>
+                                <label for="video-selector" class="block text-sm font-medium text-gray-300 mb-1">Selector de Video (iframe/video)</label>
+                                <input type="text" id="video-selector" class="input-field w-full p-2 rounded-md" placeholder="iframe, .m3u8-player">
+                            </div>
+                            <div>
+                                <label for="video-indicator-selector" class="block text-sm font-medium text-gray-300 mb-1">Selector Indicador de Video (en listado)</label>
+                                <input type="text" id="video-indicator-selector" class="input-field w-full p-2 rounded-md" placeholder=".play-icon, .is-video">
+                            </div>
+                             <div>
+                                <label for="chapter-synopsis-selector" class="block text-sm font-medium text-gray-300 mb-1">Selector Sinopsis de Capítulo</label>
+                                <input type="text" id="chapter-synopsis-selector" class="input-field w-full p-2 rounded-md" placeholder=".episode-summary p">
+                            </div>
+                            <div>
+                                <label for="episode-button-selector" class="block text-sm font-medium text-gray-300 mb-1">Selector de Botones de Episodio</label>
+                                <input type="text" id="episode-button-selector" class="input-field w-full p-2 rounded-md" placeholder=".episode-list a">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-between items-center p-4 border-t border-gray-700 mt-auto bg-gray-800 rounded-b-lg">
+                <div class="flex items-center gap-2">
+                     <button id="import-json-btn" class="icon-btn btn-secondary p-2 rounded-lg" title="Importar configuración desde JSON">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                     </button>
+                     <button id="copy-json-btn" class="icon-btn btn-secondary p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" title="Copiar la configuración actual como texto JSON al portapapeles">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                     </button>
+                     <button id="copy-btn" class="icon-btn btn-secondary p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" title="Crear un duplicado de esta configuración">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2v-2"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 1a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V3a2 2 0 012-2h2"></path></svg>
+                     </button>
+                     <button id="delete-btn" class="icon-btn btn-danger p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" title="Eliminar permanentemente esta configuración">
+                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                     </button>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div id="loader" class="hidden"><div class="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-blue-400"></div></div>
+                    <span id="loader-text" class="text-sm text-gray-400"></span>
+                    <button id="save-btn" class="btn-secondary text-sm font-semibold py-2 px-4 rounded-md">Guardar</button>
+                    <button id="extract-btn" class="btn-primary font-bold py-2 px-6 rounded-md">Extraer Solo Esta</button>
+                </div>
             </div>
         </div>
     </div>
     
-    <!-- Banner de notificación de proximidad -->
-    <div id="proximity-notification" class="notification absolute top-4 left-1/2 -translate-x-1/2 z-40 bg-green-500 text-white font-bold py-3 px-6 rounded-lg shadow-xl w-11/12 max-w-md text-center">
-        <p id="notification-text"></p>
+    <!-- Modal para Importar JSON -->
+    <div id="import-json-modal" class="modal fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50 hidden opacity-0">
+        <div class="modal-content rounded-lg shadow-xl w-full max-w-lg flex flex-col transform scale-95">
+            <div class="flex justify-between items-center p-4 border-b border-gray-700">
+                <h2 class="text-xl font-bold text-white">Importar Configuración desde JSON</h2>
+                <button id="close-import-modal-btn" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
+            </div>
+            <div class="p-6">
+                <label for="json-input" class="block text-sm font-medium text-gray-300 mb-2">Pega el código JSON de la configuración aquí:</label>
+                <textarea id="json-input" rows="10" class="textarea-field w-full p-2 rounded-md text-gray-200 focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder='{ "name": "Mi Config", "url": "https://...", ... }'></textarea>
+                <p id="import-error-msg" class="text-red-400 text-sm mt-2 h-4"></p>
+            </div>
+            <div class="flex justify-end items-center p-4 border-t border-gray-700 bg-gray-800 rounded-b-lg gap-4">
+                <button id="cancel-import-btn" class="btn-secondary text-sm font-semibold py-2 px-4 rounded-md">Cancelar</button>
+                <button id="confirm-import-btn" class="btn-primary font-bold py-2 px-6 rounded-md">Importar</button>
+            </div>
+        </div>
     </div>
 
+    <!-- Modal para Detalles -->
+    <div id="details-modal" class="modal fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50 hidden opacity-0">
+         <div class="modal-content rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col transform scale-95">
+            <div class="flex justify-between items-center p-4 border-b border-gray-700">
+                <h2 id="modal-title" class="text-xl font-bold text-white truncate pr-4"></h2>
+                <div class="flex items-center">
+                    <button id="modal-favorite-btn" class="text-gray-400 p-2 rounded-full">
+                         <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24"><path d="M12.62 20.81C12.28 20.93 11.72 20.93 11.38 20.81C8.48 19.82 2 15.69 2 8.69C2 5.6 4.49 3.1 7.56 3.1C9.38 3.1 11.04 3.98 12 5.31C12.96 3.98 14.62 3.1 16.44 3.1C19.51 3.1 22 5.6 22 8.69C22 15.69 15.52 19.82 12.62 20.81Z"></path></svg>
+                    </button>
+                    <button id="close-details-modal-btn" class="text-gray-400 hover:text-white text-3xl leading-none ml-2">&times;</button>
+                </div>
+            </div>
+            <div id="modal-body" class="p-4 sm:p-6 overflow-y-auto"></div>
+        </div>
+    </div>
+    
+    <!-- Modal de Confirmación de Enlace Externo -->
+    <div id="confirm-external-link-modal" class="modal fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50 hidden opacity-0">
+        <div class="modal-content rounded-lg shadow-xl w-full max-w-lg flex flex-col transform scale-95">
+            <div class="flex justify-between items-center p-4 border-b border-gray-700">
+                <h2 class="text-xl font-bold text-white">Confirmar Navegación</h2>
+                <button id="close-confirm-link-modal-btn" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
+            </div>
+            <div class="p-6">
+                <p class="text-gray-300 mb-2">Estás a punto de abrir un enlace externo en una nueva pestaña. ¿Deseas continuar?</p>
+                <p class="text-sm text-blue-400 bg-gray-800 p-2 rounded-md break-all" id="external-link-url"></p>
+            </div>
+            <div class="flex justify-end items-center p-4 border-t border-gray-700 bg-gray-800 rounded-b-lg gap-4">
+                <button id="cancel-external-link-btn" class="btn-secondary text-sm font-semibold py-2 px-4 rounded-md">Cancelar</button>
+                <button id="confirm-external-link-btn" class="btn-primary font-bold py-2 px-6 rounded-md">Continuar</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal de Pop-up Bloqueado -->
+    <div id="popup-blocked-modal" class="modal fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50 hidden opacity-0">
+        <div class="modal-content rounded-lg shadow-xl w-full max-w-lg flex flex-col transform scale-95">
+            <div class="flex justify-between items-center p-4 border-b border-gray-700">
+                <h2 class="text-xl font-bold text-white">Ventana Emergente Bloqueada</h2>
+                <button id="close-popup-blocked-modal-btn" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
+            </div>
+            <div class="p-6">
+                <p class="text-gray-300 mb-2">Se ha bloqueado una ventana emergente. Puedes abrirla en una nueva pestaña o copiar el enlace para abrirlo de forma segura en otro navegador.</p>
+                <p class="text-sm text-blue-400 bg-gray-800 p-2 rounded-md break-all" id="popup-blocked-url"></p>
+            </div>
+            <div class="flex justify-end items-center p-4 border-t border-gray-700 bg-gray-800 rounded-b-lg gap-4">
+                <button id="cancel-popup-blocked-btn" class="btn-secondary text-sm font-semibold py-2 px-4 rounded-md">Cancelar</button>
+                <button id="copy-popup-blocked-link-btn" class="btn-secondary text-sm font-semibold py-2 px-4 rounded-md">Copiar Enlace</button>
+                <button id="confirm-popup-blocked-btn" class="btn-primary font-bold py-2 px-6 rounded-md">Abrir</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmación de Carga Insegura (sin sandbox) -->
+    <div id="redirect-confirm-modal" class="modal fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50 hidden opacity-0">
+        <div class="modal-content rounded-lg shadow-xl w-full max-w-lg flex flex-col transform scale-95">
+            <div class="flex justify-between items-center p-4 border-b border-gray-700">
+                <h2 class="text-xl font-bold text-white">Advertencia de Seguridad</h2>
+                <button id="close-redirect-confirm-modal-btn" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
+            </div>
+            <div class="p-6">
+                <p class="text-yellow-300">El bloqueador de redirecciones está desactivado. El contenido del video podría redirigirte fuera de la aplicación.</p>
+                <p class="text-gray-300 mt-2">¿Deseas cargar el video de todos modos?</p>
+                <div class="mt-4">
+                    <label for="never-show-redirect-confirm" class="flex items-center text-sm text-gray-400 cursor-pointer">
+                        <input type="checkbox" id="never-show-redirect-confirm" class="h-4 w-4 bg-gray-700 border-gray-600 rounded text-blue-500 focus:ring-blue-500">
+                        <span class="ml-2">No volver a mostrar este mensaje</span>
+                    </label>
+                </div>
+            </div>
+            <div class="flex justify-end items-center p-4 border-t border-gray-700 bg-gray-800 rounded-b-lg gap-4">
+                <button id="cancel-redirect-confirm-btn" class="btn-secondary text-sm font-semibold py-2 px-4 rounded-md">Cancelar</button>
+                <button id="confirm-redirect-confirm-btn" class="btn-danger font-bold py-2 px-6 rounded-md">Cargar de todos modos</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Contenido Principal -->
+    <div class="container mx-auto p-4 max-w-7xl">
+        <header class="sticky top-0 z-40 bg-gray-900 flex flex-col sm:flex-row justify-between sm:items-center py-4 gap-6">
+            <div class="flex-1">
+                <h1 id="catalog-title" class="text-4xl sm:text-5xl font-bold text-white">Mi Catálogo Web</h1>
+                <div class="flex items-center gap-4">
+                    <p id="catalog-subtitle" class="text-gray-400 mt-2">Contenido extraído de la web.</p>
+                    <p id="auto-update-status" class="text-xs text-blue-400 mt-2"></p>
+                </div>
+                <button id="back-to-catalog-btn" class="hidden mt-2 text-sm text-blue-400 hover:underline">&larr; Volver al catálogo completo</button>
+            </div>
+            <div class="flex items-center gap-4 w-full sm:w-auto">
+                <div class="relative flex-1 sm:flex-auto">
+                    <input type="text" id="search-input" class="search-field w-full pl-4 pr-10 py-2 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Buscar...">
+                    <button id="search-web-btn" class="absolute inset-y-0 right-0 px-3 flex items-center text-gray-400 hover:text-blue-400" title="Buscar en la Web">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    </button>
+                </div>
+                <button id="show-favorites-btn" class="btn-secondary p-3 rounded-lg" title="Mostrar Favoritos">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.5l1.318-1.182a4.5 4.5 0 116.364 6.364L12 21l-7.682-7.318a4.5 4.5 0 010-6.364z"></path></svg>
+                </button>
+                <button id="open-scraper-modal-btn" class="btn-secondary p-3 rounded-lg" title="Configuración y Combinación">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0 3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                </button>
+            </div>
+        </header>
+        <main class="mt-8">
+            <div id="grid-output" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6"></div>
+        </main>
+        <nav id="pagination-controls" class="flex justify-center items-center space-x-2 mt-8 py-4"></nav>
+    </div>
+    
+    <template id="field-template">
+        <div class="field-item grid grid-cols-12 gap-2 items-center">
+            <input type="text" class="field-key input-field col-span-3 p-2 rounded-md text-sm" placeholder="Nombre">
+            <input type="text" class="field-selector input-field col-span-5 p-2 rounded-md text-sm" placeholder="Selector">
+            <input type="text" class="field-attribute input-field col-span-3 p-2 rounded-md text-sm" placeholder="Atributo">
+            <button class="remove-field-btn btn-danger p-2 rounded-md col-span-1 flex justify-center items-center font-bold">&times;</button>
+        </div>
+    </template>
+    
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // --- CONSTANTES DE UI ---
-            const mapElement = document.getElementById('map');
-            const alertList = document.getElementById('alert-list');
-            const noAlertsMessage = document.getElementById('no-alerts-message');
-            const addAlertModal = document.getElementById('add-alert-modal');
-            const alertNameInput = document.getElementById('alert-name-input');
-            const confirmAddAlertBtn = document.getElementById('confirm-add-alert');
-            const cancelAddAlertBtn = document.getElementById('cancel-add-alert');
-            const proximityNotification = document.getElementById('proximity-notification');
-            const notificationText = document.getElementById('notification-text');
-            const toggleHelpBtn = document.getElementById('toggle-help');
-            const helpText = document.getElementById('help-text');
-            const geolocationStatusPanel = document.getElementById('geolocation-status-panel');
-            const geolocationStatusText = document.getElementById('geolocation-status-text');
-            const geolocationStatusSubtext = document.getElementById('geolocation-status-subtext');
-            const retryGeolocationBtn = document.getElementById('retry-geolocation-btn');
-            const uiPanel = document.getElementById('ui-panel');
+    document.addEventListener('DOMContentLoaded', () => {
+        const doc = document;
+        const originalPageTitle = doc.title;
+        const PROXY_URL = 'https://corsproxy.io/?'; 
 
-            // --- ESTADO DE LA APLICACIÓN ---
-            let userMarker = null;
-            let tempCoords = null;
-            let alerts = [];
-            let map;
+        // Elementos de UI
+        const gridOutput = doc.getElementById('grid-output');
+        const paginationControls = doc.getElementById('pagination-controls');
+        const catalogTitle = doc.getElementById('catalog-title');
+        const catalogSubtitle = doc.getElementById('catalog-subtitle');
+        const searchInput = doc.getElementById('search-input');
+        const searchWebBtn = doc.getElementById('search-web-btn');
+        const backToCatalogBtn = doc.getElementById('back-to-catalog-btn');
+        const autoUpdateStatus = doc.getElementById('auto-update-status');
+        const showFavoritesBtn = doc.getElementById('show-favorites-btn');
+        // Modales
+        const scraperModal = doc.getElementById('scraper-modal');
+        const detailsModal = doc.getElementById('details-modal');
+        const importJsonModal = doc.getElementById('import-json-modal');
+        const confirmExternalLinkModal = doc.getElementById('confirm-external-link-modal');
+        const popupBlockedModal = doc.getElementById('popup-blocked-modal');
+        const redirectConfirmModal = doc.getElementById('redirect-confirm-modal');
+        const openScraperBtn = doc.getElementById('open-scraper-modal-btn');
+        const closeScraperBtn = doc.getElementById('close-scraper-modal-btn');
+        const closeDetailsBtn = doc.getElementById('close-details-modal-btn');
+        const closeImportModalBtn = doc.getElementById('close-import-modal-btn');
+        const closeConfirmLinkModalBtn = doc.getElementById('close-confirm-link-modal-btn');
+        const closePopupBlockedModalBtn = doc.getElementById('close-popup-blocked-modal-btn');
+        const closeRedirectConfirmModalBtn = doc.getElementById('close-redirect-confirm-modal-btn');
+        // Contenido Modales
+        const modalTitle = doc.getElementById('modal-title');
+        const modalBody = doc.getElementById('modal-body');
+        const modalFavoriteBtn = doc.getElementById('modal-favorite-btn');
+        // Formulario Scraper
+        const configSelect = doc.getElementById('config-select');
+        const configNameInput = doc.getElementById('config-name');
+        const urlInput = doc.getElementById('url');
+        const searchUrlInput = doc.getElementById('search-url');
+        const searchPaginationPatternInput = doc.getElementById('search-pagination-pattern');
+        const containerSelectorInput = doc.getElementById('containerSelector');
+        const pageCountInput = doc.getElementById('page-count');
+        const paginationPatternInput = doc.getElementById('pagination-pattern');
+        const fieldsContainer = doc.getElementById('fields-container');
+        const addFieldBtn = doc.getElementById('add-field-btn');
+        const saveBtn = doc.getElementById('save-btn');
+        const deleteBtn = doc.getElementById('delete-btn');
+        const copyBtn = doc.getElementById('copy-btn');
+        const copyJsonBtn = doc.getElementById('copy-json-btn');
+        const importJsonBtn = doc.getElementById('import-json-btn');
+        const extractBtn = doc.getElementById('extract-btn');
+        const loader = doc.getElementById('loader');
+        const loaderText = doc.getElementById('loader-text');
+        const fieldTemplate = doc.getElementById('field-template');
+        const genreSelectorInput = doc.getElementById('genre-selector');
+        const descriptionSelectorInput = doc.getElementById('description-selector');
+        const videoSelectorInput = doc.getElementById('video-selector');
+        const videoIndicatorSelectorInput = doc.getElementById('video-indicator-selector');
+        const chapterSynopsisSelectorInput = doc.getElementById('chapter-synopsis-selector');
+        const episodeButtonSelectorInput = doc.getElementById('episode-button-selector');
+        // Combinación y Utilidades
+        const combineBtn = doc.getElementById('combine-btn');
+        const combineListContainer = doc.getElementById('combine-list-container');
+        const adBlockToggle = doc.getElementById('adblock-toggle');
+        const popupBlockerToggle = doc.getElementById('popup-blocker-toggle');
+        const redirectBlockerToggle = doc.getElementById('redirect-blocker-toggle');
+        const autoUpdateToggle = doc.getElementById('auto-update-toggle');
+        const autoUpdateIntervalInput = doc.getElementById('auto-update-interval');
+        // Importación
+        const jsonInput = doc.getElementById('json-input');
+        const importErrorMsg = doc.getElementById('import-error-msg');
+        const cancelImportBtn = doc.getElementById('cancel-import-btn');
+        const confirmImportBtn = doc.getElementById('confirm-import-btn');
+        // Confirmaciones
+        const externalLinkUrl = doc.getElementById('external-link-url');
+        const cancelExternalLinkBtn = doc.getElementById('cancel-external-link-btn');
+        const confirmExternalLinkBtn = doc.getElementById('confirm-external-link-btn');
+        const popupBlockedUrl = doc.getElementById('popup-blocked-url');
+        const cancelPopupBlockedBtn = doc.getElementById('cancel-popup-blocked-btn');
+        const confirmPopupBlockedBtn = doc.getElementById('confirm-popup-blocked-btn');
+        const copyPopupBlockedLinkBtn = doc.getElementById('copy-popup-blocked-link-btn');
+        const cancelRedirectConfirmBtn = doc.getElementById('cancel-redirect-confirm-btn');
+        const confirmRedirectConfirmBtn = doc.getElementById('confirm-redirect-confirm-btn');
+        const neverShowRedirectConfirmCheckbox = doc.getElementById('never-show-redirect-confirm');
 
-            // --- INICIALIZACIÓN ---
-            function initializeMap() {
-                map = L.map(mapElement).setView([14.6349, -90.5069], 13);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                }).addTo(map);
+        // Estado de la aplicación
+        let configurations = [];
+        let currentConfigId = null;
+        let originalScrapedData = [];
+        let currentScrapedData = [];
+        let currentPage = 1;
+        let searchTerm = '';
+        let urlToOpen = '';
+        let blockedPopupArgs = null;
+        let unsafeIframeArgs = null;
+        let isAdBlockerEnabled = true;
+        let isPopupBlockerEnabled = true;
+        let isRedirectBlockerEnabled = true;
+        let neverShowRedirectConfirm = false;
+        let isAutoUpdateEnabled = false;
+        let autoUpdateInterval = 5;
+        let autoUpdateTimerId = null;
+        let countdownTimerId = null;
+        let knownItemKeys = new Set();
+        let favorites = new Map();
+        let viewingHistory = new Map();
+        let isShowingFavorites = false;
+        let activeItemForFavoriteModal = null;
+        const itemsPerPage = 30;
+        const adBlocklist = [
+            'adserve', 'adserver', 'doubleclick.net', 'ads.google.com',
+            'googlesyndication.com', 'adriver.ru', '2mdn.net',
+            'adform.net', 'adfox.ru', '/ads/', 'syndication.',
+            'adnxs.com', 'advertising.com', 'openx.net', 'popads.net',
+            'popcash.net', 'propellerads.com', 'yadro.ru'
+        ];
 
-                map.on('click', onMapClick);
+        // --- Bloqueador de Pop-ups ---
+        const originalWindowOpen = window.open;
+        window.open = function(...args) {
+            if (isPopupBlockerEnabled) {
+                const url = args[0] || '';
+                console.warn('Pop-up bloqueado:', url);
+                popupBlockedUrl.textContent = url;
+                blockedPopupArgs = args;
+                openModal(popupBlockedModal);
+                return null; // Prevenir la apertura
             }
-            
-            initializeMap();
-            loadAlertsFromLocalStorage();
-            startGeolocation();
+            return originalWindowOpen.apply(window, args);
+        };
 
-            // --- GEOLOCALIZACIÓN ---
-            function startGeolocation() {
-                if (!('geolocation' in navigator)) {
-                    showGeolocationError("Geolocalización no disponible", "Tu navegador no soporta esta función.");
+
+        // --- Gestión de Datos y Modales ---
+        const saveConfigs = () => localStorage.setItem('scraperConfigs', JSON.stringify(configurations));
+        const loadConfigs = () => configurations = JSON.parse(localStorage.getItem('scraperConfigs')) || [];
+        const saveLastScrapedData = (data, configId, isCombined = false) => {
+            localStorage.setItem('lastScrapedData', JSON.stringify(data));
+            localStorage.setItem('lastScrapedConfigId', configId);
+            localStorage.setItem('lastViewWasCombined', isCombined);
+            
+            knownItemKeys = new Set(data.map(item => getItemKey(item)));
+            localStorage.setItem('knownItemKeys', JSON.stringify(Array.from(knownItemKeys)));
+
+            setupAutoUpdate();
+        };
+        const loadLastScrapedData = () => {
+            const scrapedData = JSON.parse(localStorage.getItem('lastScrapedData')) || [];
+            
+            const combinedDataMap = new Map();
+            for (const fav of favorites.values()) {
+                combinedDataMap.set(getItemKey(fav.item), fav.item);
+            }
+            for (const item of scrapedData) {
+                const itemKey = getItemKey(item);
+                if (combinedDataMap.has(itemKey)) {
+                    const existingFav = combinedDataMap.get(itemKey);
+                    combinedDataMap.set(itemKey, { ...existingFav, ...item });
+                } else {
+                    combinedDataMap.set(itemKey, item);
+                }
+            }
+
+            currentScrapedData = Array.from(combinedDataMap.values());
+            originalScrapedData = [...currentScrapedData];
+            
+            const savedKeys = JSON.parse(localStorage.getItem('knownItemKeys')) || [];
+            knownItemKeys = new Set(savedKeys);
+
+            let configId = localStorage.getItem('lastScrapedConfigId');
+            const isCombined = JSON.parse(localStorage.getItem('lastViewWasCombined')) || false;
+            let configName = 'Mi Catálogo Web';
+            if (isCombined) {
+                configName = 'Catálogo Combinado';
+            } else if (configId) {
+                const config = configurations.find(c => c.id === configId);
+                if(config) configName = config.name;
+            }
+            catalogTitle.textContent = configName;
+            displayGrid();
+            setupAutoUpdate();
+        };
+        const openModal = (modal) => {
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.add('opacity-100');
+                modal.querySelector('.modal-content').classList.add('scale-100');
+            }, 10);
+        };
+        const closeModal = (modal) => {
+            modal.classList.remove('opacity-100');
+            modal.querySelector('.modal-content').classList.remove('scale-100');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        };
+        
+        // --- Lógica de Favoritos e Historial ---
+        const loadFavorites = () => {
+            const savedFavorites = JSON.parse(localStorage.getItem('favorites')) || [];
+            favorites = new Map(savedFavorites.map(fav => [getItemKey(fav.item), fav]));
+        };
+        const saveFavorites = () => {
+            localStorage.setItem('favorites', JSON.stringify(Array.from(favorites.values())));
+        };
+        const loadViewingHistory = () => {
+            const savedHistory = JSON.parse(localStorage.getItem('viewingHistory')) || [];
+            viewingHistory = new Map(savedHistory);
+        };
+        const saveViewingHistory = () => {
+            localStorage.setItem('viewingHistory', JSON.stringify(Array.from(viewingHistory.entries())));
+        };
+        const getItemKey = (item) => (item.nombre || '') + '||' + (item.url || '');
+        const isFavorite = (item) => favorites.has(getItemKey(item));
+        
+        async function toggleFavorite(item) {
+            const itemKey = getItemKey(item);
+            if (favorites.has(itemKey)) {
+                favorites.delete(itemKey);
+            } else {
+                const count = await getEpisodeCount(item);
+                const favData = { item, knownEpisodeCount: count, hasNewEpisode: false };
+                favorites.set(itemKey, favData);
+            }
+            saveFavorites();
+            if (isShowingFavorites) {
+                loadLastScrapedData(); 
+            } else {
+                displayGrid(); 
+            }
+        };
+
+        // --- Lógica de la Galería, Paginación y Búsqueda ---
+        function setupPagination(filteredData) {
+            paginationControls.innerHTML = '';
+            const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+            if (totalPages <= 1) return;
+            const createBtn = (text, page, isDisabled = false, isActive = false) => {
+                const btn = doc.createElement('button');
+                btn.innerHTML = text;
+                btn.disabled = isDisabled;
+                btn.className = `pagination-btn py-2 px-4 rounded-md text-sm font-semibold ${isActive ? 'active' : ''}`;
+                btn.addEventListener('click', () => { currentPage = page; displayGrid(); });
+                return btn;
+            };
+            paginationControls.appendChild(createBtn('&laquo; Ant', currentPage - 1, currentPage === 1));
+            for (let i = 1; i <= totalPages; i++) {
+                if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
+                    paginationControls.appendChild(createBtn(i, i, false, i === currentPage));
+                } else if (i === currentPage - 2 || i === currentPage + 2) {
+                    const dots = doc.createElement('span');
+                    dots.textContent = '...';
+                    dots.className = 'px-2 text-gray-500';
+                    paginationControls.appendChild(dots);
+                }
+            }
+            paginationControls.appendChild(createBtn('Sig &raquo;', currentPage + 1, currentPage === totalPages));
+        }
+
+        function displayGrid() {
+            gridOutput.innerHTML = '';
+            let sourceData = isShowingFavorites ? Array.from(favorites.values()).map(fav => fav.item) : currentScrapedData;
+            
+            const filteredData = searchTerm ? sourceData.filter(item => item.nombre?.toLowerCase().includes(searchTerm)) : sourceData;
+            
+            if (!filteredData || filteredData.length === 0) {
+                let emptyMessage = 'No hay datos. Abre la configuración para empezar a extraer.';
+                if(isShowingFavorites) emptyMessage = 'No tienes elementos favoritos. ¡Añade algunos!';
+                if(searchTerm) emptyMessage = 'No se encontraron resultados para tu búsqueda.';
+                gridOutput.innerHTML = `<p class="col-span-full text-center text-gray-500">${emptyMessage}</p>`;
+                catalogSubtitle.textContent = isShowingFavorites ? `${filteredData.length} favoritos encontrados.` : (searchTerm ? `0 resultados para "${searchTerm}"` : "0 elementos encontrados.");
+                setupPagination([]);
+                return;
+            }
+
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const endIndex = startIndex + itemsPerPage;
+            const paginatedItems = filteredData.slice(startIndex, endIndex);
+            paginatedItems.forEach(item => {
+                if (!item.nombre || !item.imagen) return;
+                const poster = doc.createElement('div');
+                poster.className = 'grid-poster group block rounded-lg overflow-hidden cursor-pointer';
+
+                const favButton = doc.createElement('button');
+                favButton.className = 'favorite-btn-overlay';
+                favButton.title = 'Añadir a Favoritos';
+                favButton.innerHTML = `<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24"><path d="M12.62 20.81C12.28 20.93 11.72 20.93 11.38 20.81C8.48 19.82 2 15.69 2 8.69C2 5.6 4.49 3.1 7.56 3.1C9.38 3.1 11.04 3.98 12 5.31C12.96 3.98 14.62 3.1 16.44 3.1C19.51 3.1 22 5.6 22 8.69C22 15.69 15.52 19.82 12.62 20.81Z"></path></svg>`;
+                if (isFavorite(item)) {
+                    favButton.classList.add('favorited');
+                }
+                favButton.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    toggleFavorite(item);
+                });
+
+                const playOverlayHTML = item.hasVideo ? `<div class="play-overlay"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg></div>` : '';
+                
+                const favoriteData = favorites.get(getItemKey(item));
+                const newEpisodeBadge = (favoriteData && favoriteData.hasNewEpisode) ? `<div class="new-episode-badge">NUEVO</div>` : '';
+
+                poster.innerHTML = `${newEpisodeBadge}<img src="${item.imagen}" alt="${item.nombre}" class="w-full h-auto object-cover">${playOverlayHTML}<div class="p-2"><h4 class="text-sm font-semibold text-white truncate">${item.nombre}</h4></div>`;
+                poster.appendChild(favButton);
+                poster.addEventListener('click', () => showItemDetails(item));
+                gridOutput.appendChild(poster);
+            });
+            catalogSubtitle.textContent = isShowingFavorites ? `Mostrando ${paginatedItems.length} de ${filteredData.length} favoritos.` : `Mostrando ${paginatedItems.length} de ${filteredData.length} resultados. (Total: ${originalScrapedData.length} en catálogo)`;
+            setupPagination(filteredData);
+        }
+
+        // --- Lógica de Detalles Mejorada ---
+        async function showItemDetails(item) {
+            activeItemForFavoriteModal = item;
+            const itemKey = getItemKey(item);
+
+            if (favorites.has(itemKey) && favorites.get(itemKey).hasNewEpisode) {
+                const favData = favorites.get(itemKey);
+                const currentCount = await getEpisodeCount(item);
+                favData.hasNewEpisode = false;
+                favData.knownEpisodeCount = currentCount;
+                favorites.set(itemKey, favData);
+                saveFavorites();
+                displayGrid();
+            }
+
+            doc.title = `${item.nombre} | ${originalPageTitle}`;
+            modalTitle.textContent = item.nombre;
+            modalFavoriteBtn.classList.toggle('favorited', isFavorite(item));
+            openModal(detailsModal);
+            modalBody.innerHTML = `<div class="text-center"><div class="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-400"></div><p class="mt-2">Analizando contenido...</p></div>`;
+
+            let continueWatchingHTML = '';
+            if (viewingHistory.has(itemKey)) {
+                const history = viewingHistory.get(itemKey);
+                continueWatchingHTML = `
+                    <div id="continue-watching-banner" class="mb-4 p-4 bg-gray-800 rounded-lg text-center">
+                        <p class="text-sm text-gray-400">Visto por última vez:</p>
+                        <button class="btn-primary font-bold py-2 px-6 rounded-md mt-2" data-href="${history.href}">
+                            Continuar Viendo: ${history.text}
+                        </button>
+                    </div>`;
+            }
+
+            if (!item.url) {
+                modalBody.innerHTML = continueWatchingHTML + `<p class="text-center text-yellow-400">No hay URL de detalles para este elemento.</p>` + renderItemInfo(item);
+                return;
+            }
+            fetch(PROXY_URL + encodeURIComponent(item.url))
+                .then(res => {
+                    if (!res.ok) throw new Error(`Error de red: ${res.statusText}`);
+                    return res.text();
+                })
+                .then(html => {
+                    const parser = new DOMParser();
+                    const detailDoc = parser.parseFromString(html, 'text/html');
+                    const config = configurations.find(c => c.id === item.configId);
+                    let genres = '', description = '';
+                    if (config) {
+                        if (config.genreSelector) genres = Array.from(detailDoc.querySelectorAll(config.genreSelector)).map(el => el.textContent.trim()).join(', ');
+                        if (config.descriptionSelector) description = detailDoc.querySelector(config.descriptionSelector)?.textContent.trim() || '';
+                    }
+                    const iframeSrcFromScript = findVideoInScript(detailDoc);
+                    const episodeLinks = detailDoc.querySelectorAll(config?.episodeButtonSelector || '.tab-content a.btn');
+                    if (iframeSrcFromScript) {
+                         const tempItem = {...item, customIframeSrc: iframeSrcFromScript };
+                         renderVideoPlayer(tempItem, genres, description);
+                    } else if (episodeLinks.length > 0) {
+                        renderEpisodeList(episodeLinks, item, genres, description);
+                    } else {
+                        renderVideoPlayer(item, genres, description);
+                    }
+                    modalBody.insertAdjacentHTML('afterbegin', continueWatchingHTML);
+                }).catch(error => {
+                    console.error("Error fetching details:", error);
+                    renderNoContent(item, '', '', 'No se pudo cargar la página de detalles.');
+                });
+        }
+        function findVideoInScript(detailDoc) {
+            const scripts = detailDoc.querySelectorAll('script');
+            const videoScript = Array.from(scripts).find(s => s.textContent.includes('var video = []'));
+            if (videoScript) {
+                const scriptContent = videoScript.textContent;
+                const activeTabId = detailDoc.querySelector('.TbVideoNv li[data-id].active')?.dataset.id || '1';
+                const regex = new RegExp(`video\\[${activeTabId}\\]\\s*=\\s*'(.*?)'`, 'i');
+                const match = scriptContent.match(regex);
+                if (match && match[1]) return match[1];
+            }
+            return null;
+        }
+        function renderVideoPlayer(item, genres, description) {
+            const videoPlaceholderHTML = `<div id="video-placeholder-container" class="video-placeholder mb-4"><img src="${item.imagen}" alt="Póster de ${item.nombre}"><div class="play-button"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg></div></div>`;
+            modalBody.innerHTML = videoPlaceholderHTML + renderItemInfo(item, genres, description);
+            doc.getElementById('video-placeholder-container').addEventListener('click', () => loadVideo(item, doc.getElementById('video-placeholder-container')), { once: true });
+        }
+        function renderEpisodeList(links, item, genres, description) {
+            let episodeButtonsHTML = '';
+            links.forEach(link => {
+                episodeButtonsHTML += `<button class="episode-btn" data-href="${link.href}">${link.textContent.trim()}</button>`;
+            });
+            modalBody.innerHTML = `
+                <div id="video-display-area" class="mb-4"><p class="text-center text-gray-400 p-8">Selecciona un episodio para cargarlo.</p></div>
+                <div id="chapter-synopsis-container" class="mb-4"></div> 
+                <h3 class="text-md font-semibold text-white mb-2">Episodios</h3>
+                <div class="episode-list mb-4">${episodeButtonsHTML}</div>` + 
+                renderItemInfo(item, genres, description);
+        }
+        function renderNoContent(item, genres, description, message = 'No se encontró video ni lista de episodios.') {
+             modalBody.innerHTML = `<p class="text-center text-red-400 mb-4">${message}</p>` + renderItemInfo(item, genres, description);
+        }
+        function renderItemInfo(item, genres = '', description = '') {
+            return `<div class="flex gap-4 items-start mt-4"><img src="${item.imagen}" alt="Póster" class="w-24 sm:w-32 rounded-md shadow-lg"><div><h3 class="text-lg font-bold text-white">${item.nombre}</h3><a href="${item.url}" class="external-link-trigger text-sm text-blue-400 hover:underline">Ver página original</a>${genres ? `<p class="text-sm text-gray-400 mt-2"><strong class="text-gray-300">Géneros:</strong> ${genres}</p>` : ''}</div></div>${description ? `<p class="text-sm text-gray-300 mt-4 border-t border-gray-700 pt-3">${description}</p>` : ''}`;
+        }
+        function loadVideo(item, container) {
+            container.innerHTML = `<div class="absolute inset-0 flex items-center justify-center"><div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-400"></div></div>`;
+            
+            const processUrl = (videoUrl) => {
+                const isAd = adBlocklist.some(keyword => videoUrl.includes(keyword));
+                if (isAdBlockerEnabled && isAd) {
+                    console.warn('Ad blocked:', videoUrl);
+                    container.innerHTML = `<div class="absolute inset-0 flex items-center justify-center text-center p-4 text-yellow-400"><svg class="w-8 h-8 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg><span>Contenido publicitario bloqueado.</span></div>`;
                     return;
                 }
 
-                navigator.geolocation.watchPosition(
-                    (position) => {
-                        hideGeolocationError();
-                        const { latitude, longitude } = position.coords;
-                        const userLatLng = [latitude, longitude];
-
-                        if (userMarker) {
-                            userMarker.setLatLng(userLatLng);
-                        } else {
-                            userMarker = L.marker(userLatLng, {
-                                icon: L.icon({
-                                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-                                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-                                    iconSize: [25, 41], iconAnchor: [12, 41],
-                                    popupAnchor: [1, -34], shadowSize: [41, 41]
-                                })
-                            }).addTo(map).bindPopup("<b>¡Estás aquí!</b>");
-                            map.setView(userLatLng, 15);
-                        }
-                        checkProximity(userLatLng);
-                    },
-                    (error) => {
-                        let mainMessage, subMessage;
-                        switch (error.code) {
-                            case error.PERMISSION_DENIED:
-                                // **NUEVO: Detectar el error específico de origen no seguro**
-                                if (error.message.includes('secure origins')) {
-                                    mainMessage = "Error de Origen No Seguro";
-                                    subMessage = "Carga esta página desde HTTPS o 'localhost' para usar la geolocalización.";
-                                } else {
-                                    mainMessage = "Permiso de ubicación denegado.";
-                                    subMessage = "Por favor, permite el acceso a tu ubicación en la configuración del navegador.";
-                                }
-                                break;
-                            case error.POSITION_UNAVAILABLE:
-                                mainMessage = "Ubicación no disponible.";
-                                subMessage = "No se pudo determinar tu ubicación actual.";
-                                break;
-                            case error.TIMEOUT:
-                                mainMessage = "Tiempo de espera agotado.";
-                                subMessage = "La solicitud de ubicación tardó demasiado en responder.";
-                                break;
-                            default:
-                                mainMessage = "Error desconocido de geolocalización.";
-                                subMessage = "Ocurrió un error inesperado.";
-                                break;
-                        }
-                        console.error('Error de geolocalización:', error.code, error.message);
-                        showGeolocationError(mainMessage, subMessage);
-                    },
-                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-                );
-            }
-
-            function showGeolocationError(message, subMessage) {
-                geolocationStatusText.textContent = message;
-                geolocationStatusSubtext.textContent = subMessage;
-                geolocationStatusPanel.classList.remove('hidden');
-                uiPanel.style.marginTop = `${geolocationStatusPanel.offsetHeight}px`;
-            }
-
-            function hideGeolocationError() {
-                if (!geolocationStatusPanel.classList.contains('hidden')) {
-                    geolocationStatusPanel.classList.add('hidden');
-                    uiPanel.style.marginTop = '0px';
-                }
-            }
-
-            retryGeolocationBtn.addEventListener('click', () => {
-                hideGeolocationError();
-                startGeolocation();
-            });
-
-            // --- MANEJO DE ALERTAS ---
-            function onMapClick(e) {
-                tempCoords = e.latlng;
-                alertNameInput.value = '';
-                addAlertModal.classList.remove('hidden');
-                alertNameInput.focus();
-            }
-
-            confirmAddAlertBtn.addEventListener('click', () => {
-                const name = alertNameInput.value.trim();
-                if (name && tempCoords) {
-                    addAlert(name, tempCoords.lat, tempCoords.lng);
-                    tempCoords = null;
-                    addAlertModal.classList.add('hidden');
+                if (videoUrl.endsWith('.m3u8')) {
+                    renderHlsPlayer(videoUrl, container);
+                } else if (videoUrl.endsWith('.m3u')) {
+                    container.innerHTML = `<div class="absolute inset-0 flex items-center justify-center text-yellow-400">Formato .m3u detectado. No se puede reproducir directamente.</div>`;
                 } else {
-                    showNotification('Por favor, ingresa un nombre para la alerta.', 'error');
+                    renderIframe(videoUrl, container);
                 }
-            });
-
-            cancelAddAlertBtn.addEventListener('click', () => {
-                addAlertModal.classList.add('hidden');
-                tempCoords = null;
-            });
-
-            function addAlert(name, lat, lng, id = Date.now()) {
-                const marker = L.marker([lat, lng]).addTo(map).bindPopup(`<b>${name}</b>`);
-                const circle = L.circle([lat, lng], {
-                    color: 'red', fillColor: '#f03', fillOpacity: 0.3, radius: 500
-                }).addTo(map);
-                alerts.push({ id, name, lat, lng, marker, circle });
-                renderAlertList();
-                saveAlertsToLocalStorage();
+            };
+            
+            if(item.customIframeSrc){
+                processUrl(item.customIframeSrc);
+                return;
             }
-
-            function removeAlert(id) {
-                const alertIndex = alerts.findIndex(a => a.id === id);
-                if (alertIndex > -1) {
-                    const alertToRemove = alerts[alertIndex];
-                    map.removeLayer(alertToRemove.marker);
-                    map.removeLayer(alertToRemove.circle);
-                    alerts.splice(alertIndex, 1);
-                    renderAlertList();
-                    saveAlertsToLocalStorage();
-                }
-            }
-
-            // --- RENDERIZADO Y UI ---
-            function renderAlertList() {
-                alertList.innerHTML = '';
-                noAlertsMessage.classList.toggle('hidden', alerts.length > 0);
-                alerts.forEach(alertData => {
-                    const li = document.createElement('li');
-                    li.className = 'flex justify-between items-center p-2 bg-gray-100 rounded-md';
-                    li.innerHTML = `
-                        <span class="text-gray-700 font-medium">${alertData.name}</span>
-                        <button data-id="${alertData.id}" class="delete-alert-btn p-1 text-red-500 hover:text-red-700 rounded-full hover:bg-red-100">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" /></svg>
-                        </button>`;
-                    alertList.appendChild(li);
-                });
-                document.querySelectorAll('.delete-alert-btn').forEach(btn => {
-                    btn.onclick = () => removeAlert(Number(btn.dataset.id));
-                });
-            }
-
-            toggleHelpBtn.addEventListener('click', () => helpText.classList.toggle('hidden'));
-
-            // --- LÓGICA DE PROXIMIDAD Y NOTIFICACIONES ---
-            function checkProximity(userLatLng) {
-                alerts.forEach(alertData => {
-                    const alertLatLng = L.latLng(alertData.lat, alertData.lng);
-                    if (map.distance(userLatLng, alertLatLng) <= 500) {
-                        if (!alertData.triggered) {
-                            showNotification(`¡Estás cerca de "${alertData.name}"!`);
-                            alertData.triggered = true;
-                        }
-                    } else {
-                        alertData.triggered = false;
+            
+            fetch(PROXY_URL + encodeURIComponent(item.url))
+                .then(res => {
+                    if (!res.ok) throw new Error(`Error de red: ${res.statusText}`);
+                    return res.text();
+                })
+                .then(html => {
+                    const parser = new DOMParser();
+                    const detailDoc = parser.parseFromString(html, 'text/html');
+                    let videoSrc = findVideoInScript(detailDoc);
+                    if (!videoSrc) {
+                        const config = configurations.find(c => c.id === item.configId);
+                        const videoSelector = config?.videoSelector || 'iframe';
+                        const videoElement = detailDoc.querySelector(videoSelector);
+                        if(videoElement && videoElement.src) videoSrc = videoElement.src;
                     }
+
+                    if (videoSrc) processUrl(videoSrc);
+                    else container.innerHTML = `<div class="absolute inset-0 flex items-center justify-center text-red-400">No se encontró video en esta página.</div>`;
+                }).catch(error => {
+                    console.error("Error loading video:", error);
+                    container.innerHTML = `<div class="absolute inset-0 flex items-center justify-center text-red-400">No se pudo cargar el video.</div>`;
                 });
+        }
+        function renderIframe(src, container, forceUnsafe = false) {
+            if (!isRedirectBlockerEnabled && !forceUnsafe && !neverShowRedirectConfirm) {
+                unsafeIframeArgs = { src, container };
+                openModal(redirectConfirmModal);
+                return;
             }
 
-            let notificationTimeout;
-            function showNotification(message, type = 'success') {
-                clearTimeout(notificationTimeout);
-                notificationText.textContent = message;
-                proximityNotification.className = 'notification absolute top-4 left-1/2 -translate-x-1/2 z-40 font-bold py-3 px-6 rounded-lg shadow-xl w-11/12 max-w-md text-center'; // Reset classes
-                if (type === 'error') {
-                    proximityNotification.classList.add('bg-red-500', 'text-white');
+            const videoContainer = doc.createElement('div');
+            videoContainer.className = 'video-container';
+            const iframeEl = doc.createElement('iframe');
+            iframeEl.src = src;
+            iframeEl.setAttribute('frameborder', '0');
+            iframeEl.setAttribute('allow', 'autoplay; encrypted-media; fullscreen');
+            iframeEl.setAttribute('allowfullscreen', '');
+            if (isRedirectBlockerEnabled && !forceUnsafe) {
+                iframeEl.setAttribute('sandbox', 'allow-scripts allow-fullscreen allow-same-origin');
+            }
+            videoContainer.appendChild(iframeEl);
+            container.innerHTML = '';
+            container.appendChild(videoContainer);
+        }
+        function renderHlsPlayer(src, container) {
+            const videoContainer = doc.createElement('div');
+            videoContainer.className = 'video-container';
+            const videoEl = doc.createElement('video');
+            videoEl.controls = true;
+            videoEl.autoplay = true;
+
+            if (Hls.isSupported()) {
+                const hls = new Hls();
+                hls.loadSource(src);
+                hls.attachMedia(videoEl);
+            } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+                videoEl.src = src;
+            } else {
+                 container.innerHTML = `<div class="absolute inset-0 flex items-center justify-center text-red-400">HLS no es soportado en este navegador.</div>`;
+                 return;
+            }
+            videoContainer.appendChild(videoEl);
+            container.innerHTML = '';
+            container.appendChild(videoContainer);
+        }
+        async function loadEpisode(episodeUrl, item, clickedBtn) {
+            const videoArea = doc.getElementById('video-display-area');
+            const synopsisContainer = doc.getElementById('chapter-synopsis-container');
+
+            if (clickedBtn) {
+                doc.title = `${item.nombre} - ${clickedBtn.textContent.trim()} | ${originalPageTitle}`;
+            }
+
+            videoArea.innerHTML = `<div class="absolute inset-0 flex items-center justify-center"><div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-400"></div></div>`;
+            synopsisContainer.innerHTML = '';
+
+            try {
+                const response = await fetch(PROXY_URL + encodeURIComponent(episodeUrl));
+                if (!response.ok) throw new Error(`Network response was not ok: ${response.statusText}`);
+                const html = await response.text();
+                const parser = new DOMParser();
+                const detailDoc = parser.parseFromString(html, 'text/html');
+                const config = configurations.find(c => c.id === item.configId);
+
+                // Process Video
+                let videoSrc = findVideoInScript(detailDoc);
+                if (!videoSrc) {
+                    const videoSelector = config?.videoSelector || 'iframe';
+                    const videoElement = detailDoc.querySelector(videoSelector);
+                    if (videoElement && videoElement.src) {
+                        videoSrc = new URL(videoElement.src, episodeUrl).href;
+                    }
+                }
+
+                if (videoSrc) {
+                     const isAd = adBlocklist.some(keyword => videoSrc.includes(keyword));
+                    if (isAdBlockerEnabled && isAd) {
+                         videoArea.innerHTML = `<div class="absolute inset-0 flex items-center justify-center text-center p-4 text-yellow-400"><svg class="w-8 h-8 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg><span>Contenido publicitario bloqueado.</span></div>`;
+                    } else if (videoSrc.endsWith('.m3u8')) {
+                        renderHlsPlayer(videoSrc, videoArea);
+                    } else {
+                        renderIframe(videoSrc, videoArea);
+                    }
                 } else {
-                    proximityNotification.classList.add('bg-green-500', 'text-white');
+                    videoArea.innerHTML = `<div class="absolute inset-0 flex items-center justify-center text-red-400">No se encontró video en esta página.</div>`;
                 }
-                proximityNotification.classList.add('show');
-                notificationTimeout = setTimeout(() => {
-                    proximityNotification.classList.remove('show');
-                }, 5000);
-            }
-
-            // --- PERSISTENCIA DE DATOS ---
-            function saveAlertsToLocalStorage() {
-                const alertsToSave = alerts.map(({ id, name, lat, lng }) => ({ id, name, lat, lng }));
-                localStorage.setItem('personalMapAlerts', JSON.stringify(alertsToSave));
-            }
-
-            function loadAlertsFromLocalStorage() {
-                const savedAlerts = JSON.parse(localStorage.getItem('personalMapAlerts'));
-                if (savedAlerts) {
-                    savedAlerts.forEach(a => addAlert(a.name, a.lat, a.lng, a.id));
+                
+                // Process Synopsis
+                let synopsisText = '';
+                if (config?.chapterSynopsisSelector) {
+                    const synopsisEl = detailDoc.querySelector(config.chapterSynopsisSelector);
+                    if (synopsisEl) synopsisText = synopsisEl.textContent.trim();
                 }
+                if (synopsisText) {
+                    synopsisContainer.innerHTML = `<h4 class="text-md font-semibold text-white mb-2">Sinopsis del Capítulo</h4><p class="text-sm text-gray-300">${synopsisText}</p>`;
+                    synopsisContainer.classList.add('pt-4', 'mt-4', 'border-t', 'border-gray-700');
+                } else {
+                    synopsisContainer.classList.remove('pt-4', 'mt-4', 'border-t', 'border-gray-700');
+                }
+
+                if (clickedBtn) {
+                     viewingHistory.set(getItemKey(item), { href: episodeUrl, text: clickedBtn.textContent.trim() });
+                     saveViewingHistory();
+                }
+
+            } catch(error) {
+                console.error("Error loading episode details:", error);
+                videoArea.innerHTML = `<div class="absolute inset-0 flex items-center justify-center text-red-400">No se pudo cargar el video.</div>`;
+                synopsisContainer.innerHTML = `<div class="text-center text-red-400 p-4">No se pudo cargar la sinopsis.</div>`;
+            }
+        }
+
+
+        // --- Lógica del Scraper y Combinación ---
+        const populateConfigDropdown = () => {
+            configSelect.innerHTML = '<option value="new">-- Crear/Editar Configuración --</option>';
+            configurations.forEach(config => {
+                const option = doc.createElement('option');
+                option.value = config.id;
+                option.textContent = config.name;
+                configSelect.appendChild(option);
+            });
+        };
+        const populateCombineList = () => {
+            combineListContainer.innerHTML = '';
+            if (configurations.length === 0) {
+                combineListContainer.innerHTML = `<p class="text-sm text-gray-400">Guarda al menos una configuración para poder combinarla.</p>`;
+                combineBtn.disabled = true;
+                return;
+            }
+            configurations.forEach(config => {
+                const div = doc.createElement('div');
+                div.className = 'flex items-center bg-gray-700 p-2 rounded-md';
+                div.innerHTML = `<input id="combine-${config.id}" data-config-id="${config.id}" type="checkbox" class="combine-checkbox h-4 w-4 rounded bg-gray-600 border-gray-500 text-blue-500 focus:ring-blue-500"><label for="combine-${config.id}" class="ml-2 block text-sm font-medium text-gray-200 truncate">${config.name}</label>`;
+                combineListContainer.appendChild(div);
+            });
+            combineBtn.disabled = false;
+        };
+        const clearForm = () => {
+            currentConfigId = null;
+            configNameInput.value = ''; urlInput.value = ''; searchUrlInput.value = '';
+            searchPaginationPatternInput.value = ''; containerSelectorInput.value = '';
+            pageCountInput.value = 1; paginationPatternInput.value = '';
+            genreSelectorInput.value = ''; descriptionSelectorInput.value = '';
+            videoSelectorInput.value = 'iframe, video';
+            videoIndicatorSelectorInput.value = '';
+            chapterSynopsisSelectorInput.value = '';
+            episodeButtonSelectorInput.value = '';
+            fieldsContainer.innerHTML = '';
+            createField('nombre', 'p', ''); createField('imagen', 'img', 'src'); createField('url', 'self', 'href');
+            deleteBtn.disabled = true; 
+            copyBtn.disabled = true;
+            copyJsonBtn.disabled = true;
+            configSelect.value = 'new';
+        };
+        const loadConfigIntoForm = (id) => {
+            const config = configurations.find(c => c.id === id);
+            if (!config) return clearForm();
+            currentConfigId = id;
+            configNameInput.value = config.name; urlInput.value = config.url; searchUrlInput.value = config.searchUrl || '';
+            searchPaginationPatternInput.value = config.searchPaginationPattern || '';
+            containerSelectorInput.value = config.containerSelector;
+            pageCountInput.value = config.pageCount || 1; paginationPatternInput.value = config.paginationPattern || '';
+            genreSelectorInput.value = config.genreSelector || ''; descriptionSelectorInput.value = config.descriptionSelector || '';
+            videoSelectorInput.value = config.videoSelector || 'iframe, video';
+            videoIndicatorSelectorInput.value = config.videoIndicatorSelector || '';
+            chapterSynopsisSelectorInput.value = config.chapterSynopsisSelector || '';
+            episodeButtonSelectorInput.value = config.episodeButtonSelector || '';
+            fieldsContainer.innerHTML = '';
+            (config.fields || []).forEach(f => createField(f.key, f.selector, f.attribute));
+            deleteBtn.disabled = false;
+            copyBtn.disabled = false;
+            copyJsonBtn.disabled = false;
+        };
+        const createField = (key='', selector='', attribute='') => {
+            const fieldNode = fieldTemplate.content.cloneNode(true);
+            fieldNode.querySelector('.field-key').value = key;
+            fieldNode.querySelector('.field-selector').value = selector;
+            fieldNode.querySelector('.field-attribute').value = attribute;
+            fieldsContainer.appendChild(fieldNode);
+        };
+
+        const copiarConfiguracion = () => {
+            if (!currentConfigId) return;
+            const originalName = configNameInput.value.trim();
+            const newName = `Copia de ${originalName || 'configuración sin nombre'}`;
+            const configData = {
+                name: newName, url: urlInput.value.trim(), searchUrl: searchUrlInput.value.trim(),
+                searchPaginationPattern: searchPaginationPatternInput.value.trim(),
+                containerSelector: containerSelectorInput.value.trim(), pageCount: parseInt(pageCountInput.value, 10) || 1,
+                paginationPattern: paginationPatternInput.value.trim(), genreSelector: genreSelectorInput.value.trim(),
+                descriptionSelector: descriptionSelectorInput.value.trim(), videoSelector: videoSelectorInput.value.trim(),
+                videoIndicatorSelector: videoIndicatorSelectorInput.value.trim(), chapterSynopsisSelector: chapterSynopsisSelectorInput.value.trim(),
+                episodeButtonSelector: episodeButtonSelectorInput.value.trim(),
+                fields: Array.from(doc.querySelectorAll('.field-item')).map(item => ({ key: item.querySelector('.field-key').value.trim(), selector: item.querySelector('.field-selector').value.trim(), attribute: item.querySelector('.field-attribute').value.trim() })).filter(f => f.key && f.selector)
+            };
+            const newConfig = { id: `config_${Date.now()}`, ...configData };
+            configurations.push(newConfig);
+            saveConfigs(); populateConfigDropdown();
+            configSelect.value = newConfig.id;
+            loadConfigIntoForm(newConfig.id);
+        };
+
+        const performScrape = async (config, searchMode = false, searchTerm = '') => {
+            let { url, containerSelector, fields, pageCount, paginationPattern, searchUrl, searchPaginationPattern, videoIndicatorSelector } = config;
+            
+            if (!containerSelector || (!url && !searchMode)) return [];
+            
+            const urlsToFetch = [];
+            let baseUrl = '';
+
+            if (searchMode) {
+                const searchTermFormatted = searchTerm.replace(/ /g, '+');
+                baseUrl = `${searchUrl}${searchTermFormatted}`;
+                urlsToFetch.push(baseUrl);
+                if (searchPaginationPattern) {
+                    for (let i = 2; i <= pageCount; i++) {
+                        urlsToFetch.push(`${baseUrl}${searchPaginationPattern}${i}`);
+                    }
+                }
+            } else {
+                baseUrl = url;
+                urlsToFetch.push(baseUrl);
+                if (paginationPattern) {
+                    for (let i = 2; i <= pageCount; i++) {
+                        urlsToFetch.push(`${baseUrl}${paginationPattern}${i}`);
+                    }
+                }
+            }
+            
+            let configResults = [];
+            for (const currentUrl of urlsToFetch) {
+                 try {
+                    const response = await fetch(PROXY_URL + encodeURIComponent(currentUrl));
+                    if (!response.ok) { 
+                        console.warn(`Falló la petición para ${currentUrl}: ${response.statusText}`);
+                        continue; 
+                    }
+                    const html = await response.text();
+                    const docParser = new DOMParser();
+                    const parsedDoc = docParser.parseFromString(html, 'text/html');
+                    const pageData = Array.from(parsedDoc.querySelectorAll(containerSelector)).map(item => {
+                        const extracted = { configId: config.id };
+                        fields.forEach(field => {
+                            const el = (field.selector.toLowerCase() === 'self') ? item : item.querySelector(field.selector);
+                            if(el) {
+                                let value = field.attribute ? (el.getAttribute(field.attribute) || '') : el.textContent.trim();
+                                if(field.key === 'url' && field.attribute === 'href' && value && !value.startsWith('http')) {
+                                    value = new URL(value, baseUrl).href;
+                                }
+                                extracted[field.key] = value;
+                            }
+                        });
+                        if (videoIndicatorSelector && item.querySelector(videoIndicatorSelector)) {
+                            extracted.hasVideo = true;
+                        }
+                        return extracted;
+                    });
+                    configResults = configResults.concat(pageData);
+                } catch (error) { 
+                    console.error(`Error extrayendo de ${currentUrl}:`, error);
+                }
+            }
+            return configResults;
+        };
+        
+        // --- Eventos de UI y Carga Inicial ---
+        saveBtn.addEventListener('click', () => {
+            const name = configNameInput.value.trim();
+            if (!name) return;
+            const configData = {
+                name, url: urlInput.value.trim(), searchUrl: searchUrlInput.value.trim(),
+                searchPaginationPattern: searchPaginationPatternInput.value.trim(),
+                containerSelector: containerSelectorInput.value.trim(), pageCount: parseInt(pageCountInput.value, 10) || 1,
+                paginationPattern: paginationPatternInput.value.trim(), genreSelector: genreSelectorInput.value.trim(),
+                descriptionSelector: descriptionSelectorInput.value.trim(), videoSelector: videoSelectorInput.value.trim(),
+                videoIndicatorSelector: videoIndicatorSelectorInput.value.trim(), chapterSynopsisSelector: chapterSynopsisSelectorInput.value.trim(),
+                episodeButtonSelector: episodeButtonSelectorInput.value.trim(),
+                fields: Array.from(doc.querySelectorAll('.field-item')).map(item => ({ key: item.querySelector('.field-key').value.trim(), selector: item.querySelector('.field-selector').value.trim(), attribute: item.querySelector('.field-attribute').value.trim() })).filter(f => f.key && f.selector)
+            };
+            if (currentConfigId) {
+                const index = configurations.findIndex(c => c.id === currentConfigId);
+                configurations[index] = { ...configurations[index], ...configData };
+            } else {
+                const newConfig = { id: `config_${Date.now()}`, ...configData };
+                configurations.push(newConfig);
+                currentConfigId = newConfig.id;
+            }
+            saveConfigs(); populateConfigDropdown(); configSelect.value = currentConfigId;
+            deleteBtn.disabled = false; 
+            copyBtn.disabled = false;
+            copyJsonBtn.disabled = false;
+        });
+        
+        copyJsonBtn.addEventListener('click', () => {
+            if (!currentConfigId && !configNameInput.value.trim()) return;
+            const configData = {
+                name: configNameInput.value.trim(), url: urlInput.value.trim(), searchUrl: searchUrlInput.value.trim(),
+                searchPaginationPattern: searchPaginationPatternInput.value.trim(),
+                containerSelector: containerSelectorInput.value.trim(), pageCount: parseInt(pageCountInput.value, 10) || 1,
+                paginationPattern: paginationPatternInput.value.trim(), genreSelector: genreSelectorInput.value.trim(),
+                descriptionSelector: descriptionSelectorInput.value.trim(), videoSelector: videoSelectorInput.value.trim(),
+                videoIndicatorSelector: videoIndicatorSelectorInput.value.trim(), chapterSynopsisSelector: chapterSynopsisSelectorInput.value.trim(),
+                episodeButtonSelector: episodeButtonSelectorInput.value.trim(),
+                fields: Array.from(doc.querySelectorAll('.field-item')).map(item => ({ key: item.querySelector('.field-key').value.trim(), selector: item.querySelector('.field-selector').value.trim(), attribute: item.querySelector('.field-attribute').value.trim() })).filter(f => f.key && f.selector)
+            };
+            const jsonString = JSON.stringify(configData, null, 2);
+
+            const textArea = doc.createElement('textarea');
+            textArea.value = jsonString;
+            textArea.style.position = 'fixed'; textArea.style.top = '-9999px'; textArea.style.left = '-9999px';
+            doc.body.appendChild(textArea);
+            textArea.focus(); textArea.select();
+
+            try {
+                if (doc.execCommand('copy')) {
+                    const originalIcon = copyJsonBtn.innerHTML;
+                    const checkIcon = `<svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
+                    copyJsonBtn.innerHTML = checkIcon;
+                    setTimeout(() => { copyJsonBtn.innerHTML = originalIcon; }, 2000);
+                }
+            } catch (err) { console.error('Error al copiar al portapapeles: ', err); }
+            doc.body.removeChild(textArea);
+        });
+
+        confirmImportBtn.addEventListener('click', () => {
+            const jsonString = jsonInput.value.trim();
+            importErrorMsg.textContent = '';
+            if (!jsonString) {
+                importErrorMsg.textContent = 'El campo de texto está vacío.';
+                return;
+            }
+            try {
+                const importedData = JSON.parse(jsonString);
+                const requiredKeys = ['name', 'url', 'containerSelector', 'fields'];
+                const missingKeys = requiredKeys.filter(key => !(key in importedData));
+                if (missingKeys.length > 0) {
+                    importErrorMsg.textContent = `El JSON no es válido. Faltan las claves: ${missingKeys.join(', ')}.`;
+                    return;
+                }
+                const newConfig = { ...importedData, id: `config_${Date.now()}` };
+                configurations.push(newConfig);
+                saveConfigs();
+                populateConfigDropdown();
+                configSelect.value = newConfig.id;
+                loadConfigIntoForm(newConfig.id);
+                jsonInput.value = '';
+                importErrorMsg.textContent = '';
+                closeModal(importJsonModal);
+            } catch (error) {
+                importErrorMsg.textContent = 'El texto introducido no es un JSON válido.';
+                console.error("Error al parsear JSON:", error);
             }
         });
+
+        combineBtn.addEventListener('click', async () => {
+            const selectedConfigs = Array.from(doc.querySelectorAll('.combine-checkbox:checked')).map(cb => configurations.find(c => c.id === cb.dataset.configId)).filter(Boolean);
+            if (selectedConfigs.length === 0) return;
+            loader.classList.remove('hidden');
+            combineBtn.disabled = true; extractBtn.disabled = true;
+            let allScrapedData = [];
+            for (let i = 0; i < selectedConfigs.length; i++) {
+                const config = selectedConfigs[i];
+                loaderText.textContent = `Extrayendo de "${config.name}" (${i+1}/${selectedConfigs.length})...`;
+                const results = await performScrape(config);
+                allScrapedData = allScrapedData.concat(results);
+            }
+            const uniqueData = Array.from(new Map(allScrapedData.map(item => [getItemKey(item), item])).values());
+            searchInput.value = ''; searchTerm = '';
+            saveLastScrapedData(uniqueData, 'Catálogo Combinado', true);
+            loadLastScrapedData();
+            loader.classList.add('hidden'); loaderText.textContent = '';
+            combineBtn.disabled = false; extractBtn.disabled = false;
+            closeModal(scraperModal);
+        });
+        extractBtn.addEventListener('click', async () => {
+            const configName = configNameInput.value.trim() || 'Extracción sin título';
+            const configId = currentConfigId || `config_${Date.now()}`;
+            const currentFormData = {
+                id: configId, name: configName,
+                url: urlInput.value.trim(), searchUrl: searchUrlInput.value.trim(),
+                searchPaginationPattern: searchPaginationPatternInput.value.trim(),
+                containerSelector: containerSelectorInput.value.trim(), pageCount: parseInt(pageCountInput.value, 10) || 1,
+                paginationPattern: paginationPatternInput.value.trim(), genreSelector: genreSelectorInput.value.trim(),
+                descriptionSelector: descriptionSelectorInput.value.trim(), videoSelector: videoSelectorInput.value.trim(),
+                videoIndicatorSelector: videoIndicatorSelectorInput.value.trim(), chapterSynopsisSelector: chapterSynopsisSelectorInput.value.trim(),
+                episodeButtonSelector: episodeButtonSelectorInput.value.trim(),
+                fields: Array.from(doc.querySelectorAll('.field-item')).map(item => ({ key: item.querySelector('.field-key').value.trim(), selector: item.querySelector('.field-selector').value.trim(), attribute: item.querySelector('.field-attribute').value.trim() })).filter(f => f.key && f.selector)
+            };
+            loader.classList.remove('hidden');
+            loaderText.textContent = `Extrayendo de "${configName}"...`;
+            combineBtn.disabled = true; extractBtn.disabled = true;
+            const scrapedData = await performScrape(currentFormData);
+            
+            if (scrapedData.length === 0) {
+                 console.warn(`No se encontró contenido para "${configName}".`);
+            }
+
+            searchInput.value = ''; searchTerm = '';
+            saveLastScrapedData(scrapedData, configId, false);
+            loadLastScrapedData();
+            loader.classList.add('hidden'); loaderText.textContent = '';
+            combineBtn.disabled = false; extractBtn.disabled = false;
+            closeModal(scraperModal);
+        });
+        searchWebBtn.addEventListener('click', async () => {
+            const term = searchInput.value.trim();
+            if(!term) return;
+            const lastConfigId = localStorage.getItem('lastScrapedConfigId');
+            const isCombined = JSON.parse(localStorage.getItem('lastViewWasCombined'));
+            if(isCombined || !lastConfigId) return;
+            const config = configurations.find(c => c.id === lastConfigId);
+            if(!config || !config.searchUrl) return;
+            originalScrapedData = [...currentScrapedData];
+            loader.classList.remove('hidden');
+            loaderText.textContent = `Buscando "${term}"...`;
+            const searchResults = await performScrape(config, true, term);
+            currentScrapedData = searchResults;
+            currentPage = 1; searchTerm = ''; searchInput.value = '';
+            catalogTitle.textContent = `Resultados para: "${term}"`;
+            displayGrid();
+            loader.classList.add('hidden'); loaderText.textContent = '';
+            backToCatalogBtn.classList.remove('hidden');
+        });
+        backToCatalogBtn.addEventListener('click', () => {
+            currentScrapedData = [...originalScrapedData];
+            originalScrapedData = [];
+            searchInput.value = ''; searchTerm = '';
+            backToCatalogBtn.classList.add('hidden');
+            loadLastScrapedData();
+        });
+        configSelect.addEventListener('change', () => loadConfigIntoForm(configSelect.value));
+        deleteBtn.addEventListener('click', () => {
+            if (!currentConfigId || !confirm(`¿Estás seguro de que quieres eliminar la configuración "${configNameInput.value}"?`)) return;
+            configurations = configurations.filter(c => c.id !== currentConfigId);
+            saveConfigs();
+            populateConfigDropdown();
+            clearForm();
+        });
+        copyBtn.addEventListener('click', copiarConfiguracion);
+        searchInput.addEventListener('input', (e) => { searchTerm = e.target.value.toLowerCase(); currentPage = 1; displayGrid(); });
+        openScraperBtn.addEventListener('click', () => { populateCombineList(); openModal(scraperModal); });
+        closeScraperBtn.addEventListener('click', () => closeModal(scraperModal));
+        closeDetailsBtn.addEventListener('click', () => {
+            closeModal(detailsModal);
+            doc.title = originalPageTitle;
+        });
+        addFieldBtn.addEventListener('click', () => createField());
+        fieldsContainer.addEventListener('click', e => { if (e.target.closest('.remove-field-btn')) e.target.closest('.field-item').remove(); });
+        
+        // Listeners para el modal de importación
+        importJsonBtn.addEventListener('click', () => openModal(importJsonModal));
+        closeImportModalBtn.addEventListener('click', () => closeModal(importJsonModal));
+        cancelImportBtn.addEventListener('click', () => closeModal(importJsonModal));
+
+        // Listeners para confirmación de enlace externo
+        modalBody.addEventListener('click', e => {
+            const link = e.target.closest('.external-link-trigger');
+            if (link) {
+                e.preventDefault();
+                urlToOpen = link.href;
+                externalLinkUrl.textContent = urlToOpen;
+                openModal(confirmExternalLinkModal);
+            }
+        });
+        closeConfirmLinkModalBtn.addEventListener('click', () => closeModal(confirmExternalLinkModal));
+        cancelExternalLinkBtn.addEventListener('click', () => closeModal(confirmExternalLinkModal));
+        confirmExternalLinkBtn.addEventListener('click', () => {
+            if (urlToOpen) {
+                originalWindowOpen(urlToOpen, '_blank', 'noopener,noreferrer');
+            }
+            closeModal(confirmExternalLinkModal);
+            urlToOpen = '';
+        });
+        
+        // Listeners para pop-ups bloqueados
+        closePopupBlockedModalBtn.addEventListener('click', () => closeModal(popupBlockedModal));
+        cancelPopupBlockedBtn.addEventListener('click', () => closeModal(popupBlockedModal));
+        confirmPopupBlockedBtn.addEventListener('click', () => {
+            if (blockedPopupArgs) {
+                originalWindowOpen.apply(window, blockedPopupArgs);
+            }
+            closeModal(popupBlockedModal);
+            blockedPopupArgs = null;
+        });
+        copyPopupBlockedLinkBtn.addEventListener('click', () => {
+            const url = blockedPopupArgs ? blockedPopupArgs[0] : '';
+            if (!url) return;
+            const textArea = doc.createElement('textarea');
+            textArea.value = url;
+            doc.body.appendChild(textArea);
+            textArea.select();
+            doc.execCommand('copy');
+            doc.body.removeChild(textArea);
+            const originalText = copyPopupBlockedLinkBtn.textContent;
+            copyPopupBlockedLinkBtn.textContent = '¡Copiado!';
+            setTimeout(() => { copyPopupBlockedLinkBtn.textContent = originalText; }, 2000);
+        });
+        
+        // Listeners para confirmación de redirección
+        closeRedirectConfirmModalBtn.addEventListener('click', () => closeModal(redirectConfirmModal));
+        cancelRedirectConfirmBtn.addEventListener('click', () => {
+            if (unsafeIframeArgs && unsafeIframeArgs.container) {
+                unsafeIframeArgs.container.innerHTML = `<div class="absolute inset-0 flex items-center justify-center text-gray-400">Carga cancelada por el usuario.</div>`;
+            }
+            closeModal(redirectConfirmModal);
+            unsafeIframeArgs = null;
+        });
+        confirmRedirectConfirmBtn.addEventListener('click', () => {
+            if (neverShowRedirectConfirmCheckbox.checked) {
+                neverShowRedirectConfirm = true;
+                localStorage.setItem('neverShowRedirectConfirm', 'true');
+            }
+            if (unsafeIframeArgs) {
+                renderIframe(unsafeIframeArgs.src, unsafeIframeArgs.container, true);
+            }
+            closeModal(redirectConfirmModal);
+            unsafeIframeArgs = null;
+            neverShowRedirectConfirmCheckbox.checked = false; // Reset checkbox
+        });
+
+        // --- Lógica de Actualización Automática ---
+        async function getEpisodeCount(item) {
+            if (!item.url || !item.configId) return 0;
+            const config = configurations.find(c => c.id === item.configId);
+            if (!config || !config.episodeButtonSelector) return 0;
+            try {
+                const response = await fetch(PROXY_URL + encodeURIComponent(item.url));
+                if (!response.ok) return 0;
+                const html = await response.text();
+                const parser = new DOMParser();
+                const detailDoc = parser.parseFromString(html, 'text/html');
+                return detailDoc.querySelectorAll(config.episodeButtonSelector).length;
+            } catch (error) {
+                console.error(`Error al contar episodios para ${item.nombre}:`, error);
+                return 0;
+            }
+        }
+
+        async function checkForNewEpisodesOnStartup() {
+            if (favorites.size === 0) return;
+            autoUpdateStatus.textContent = `Buscando nuevos episodios en ${favorites.size} favoritos...`;
+            let updatesFound = false;
+            for (const fav of favorites.values()) {
+                const currentEpisodeCount = await getEpisodeCount(fav.item);
+                if (currentEpisodeCount > fav.knownEpisodeCount) {
+                    fav.hasNewEpisode = true;
+                    updatesFound = true;
+                }
+            }
+            autoUpdateStatus.textContent = updatesFound ? "¡Nuevos episodios encontrados!" : "Favoritos al día.";
+            saveFavorites();
+            displayGrid();
+            setTimeout(() => { autoUpdateStatus.textContent = ''; setupAutoUpdate(); }, 5000);
+        }
+
+        async function performAutoUpdate() {
+            const lastConfigId = localStorage.getItem('lastScrapedConfigId');
+            const isCombined = JSON.parse(localStorage.getItem('lastViewWasCombined'));
+            if (!lastConfigId || isCombined || isShowingFavorites || searchTerm) return;
+            
+            const config = configurations.find(c => c.id === lastConfigId);
+            if (!config) return;
+
+            console.log(`[Auto-Update] Buscando nuevo contenido para "${config.name}"...`);
+            const updateConfig = { ...config, pageCount: 1 };
+            const results = await performScrape(updateConfig);
+
+            const newItems = results.filter(item => !knownItemKeys.has(getItemKey(item)));
+
+            if (newItems.length > 0) {
+                console.log(`[Auto-Update] ${newItems.length} nuevo(s) elemento(s) encontrado(s).`);
+                
+                const currentScraped = JSON.parse(localStorage.getItem('lastScrapedData')) || [];
+                const updatedScraped = [...newItems, ...currentScraped];
+
+                saveLastScrapedData(updatedScraped, lastConfigId, false);
+                loadLastScrapedData();
+
+                const originalSubtitle = catalogSubtitle.textContent;
+                catalogSubtitle.textContent = `¡Actualizado con ${newItems.length} nuevo(s) elemento(s)!`;
+                setTimeout(() => {
+                    catalogSubtitle.textContent = originalSubtitle;
+                    displayGrid();
+                }, 5000);
+            } else {
+                console.log(`[Auto-Update] No se encontró nuevo contenido.`);
+            }
+        }
+
+        function setupAutoUpdate() {
+            clearInterval(autoUpdateTimerId);
+            clearInterval(countdownTimerId);
+            autoUpdateStatus.textContent = '';
+
+            const lastConfigId = localStorage.getItem('lastScrapedConfigId');
+            const isCombined = JSON.parse(localStorage.getItem('lastViewWasCombined'));
+            const isSearch = !backToCatalogBtn.classList.contains('hidden');
+            
+            if (!isAutoUpdateEnabled || !autoUpdateInterval || autoUpdateInterval < 1 || !lastConfigId || isCombined || isSearch || isShowingFavorites) {
+                return;
+            }
+
+            const intervalMillis = autoUpdateInterval * 60 * 1000;
+            let remainingSeconds = autoUpdateInterval * 60;
+            
+            autoUpdateTimerId = setInterval(performAutoUpdate, intervalMillis);
+
+            countdownTimerId = setInterval(() => {
+                remainingSeconds--;
+                if (remainingSeconds < 0) {
+                    remainingSeconds = autoUpdateInterval * 60;
+                }
+                const minutes = Math.floor(remainingSeconds / 60);
+                const seconds = remainingSeconds % 60;
+                autoUpdateStatus.textContent = `Próxima actualización en ${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }, 1000);
+        }
+
+        // --- Carga Inicial y Utilidades ---
+        const savedAdBlockerState = localStorage.getItem('adBlockerEnabled');
+        isAdBlockerEnabled = savedAdBlockerState === null ? true : JSON.parse(savedAdBlockerState);
+        adBlockToggle.checked = isAdBlockerEnabled;
+        adBlockToggle.addEventListener('change', () => {
+            isAdBlockerEnabled = adBlockToggle.checked;
+            localStorage.setItem('adBlockerEnabled', JSON.stringify(isAdBlockerEnabled));
+        });
+
+        const savedPopupBlockerState = localStorage.getItem('popupBlockerEnabled');
+        isPopupBlockerEnabled = savedPopupBlockerState === null ? true : JSON.parse(savedPopupBlockerState);
+        popupBlockerToggle.checked = isPopupBlockerEnabled;
+        popupBlockerToggle.addEventListener('change', () => {
+            isPopupBlockerEnabled = popupBlockerToggle.checked;
+            localStorage.setItem('popupBlockerEnabled', JSON.stringify(isPopupBlockerEnabled));
+        });
+
+        const savedRedirectBlockerState = localStorage.getItem('redirectBlockerEnabled');
+        isRedirectBlockerEnabled = savedRedirectBlockerState === null ? true : JSON.parse(savedRedirectBlockerState);
+        redirectBlockerToggle.checked = isRedirectBlockerEnabled;
+        redirectBlockerToggle.addEventListener('change', () => {
+            isRedirectBlockerEnabled = redirectBlockerToggle.checked;
+            localStorage.setItem('redirectBlockerEnabled', JSON.stringify(isRedirectBlockerEnabled));
+            if (isRedirectBlockerEnabled) {
+                neverShowRedirectConfirm = false;
+                localStorage.removeItem('neverShowRedirectConfirm');
+            }
+        });
+        
+        const savedAutoUpdateState = localStorage.getItem('autoUpdateEnabled');
+        isAutoUpdateEnabled = savedAutoUpdateState === null ? false : JSON.parse(savedAutoUpdateState);
+        autoUpdateToggle.checked = isAutoUpdateEnabled;
+        autoUpdateToggle.addEventListener('change', () => {
+            isAutoUpdateEnabled = autoUpdateToggle.checked;
+            localStorage.setItem('autoUpdateEnabled', JSON.stringify(isAutoUpdateEnabled));
+            setupAutoUpdate();
+        });
+        
+        const savedInterval = localStorage.getItem('autoUpdateInterval');
+        autoUpdateInterval = savedInterval === null ? 5 : parseInt(savedInterval, 10);
+        autoUpdateIntervalInput.value = autoUpdateInterval;
+        autoUpdateIntervalInput.addEventListener('change', () => {
+            const val = parseInt(autoUpdateIntervalInput.value, 10);
+            if (val > 0) {
+                autoUpdateInterval = val;
+                localStorage.setItem('autoUpdateInterval', autoUpdateInterval);
+                setupAutoUpdate();
+            }
+        });
+
+        const savedNeverShowRedirect = localStorage.getItem('neverShowRedirectConfirm');
+        neverShowRedirectConfirm = savedNeverShowRedirect === 'true';
+
+        modalFavoriteBtn.addEventListener('click', () => {
+            if (activeItemForFavoriteModal) {
+                toggleFavorite(activeItemForFavoriteModal);
+                modalFavoriteBtn.classList.toggle('favorited', isFavorite(activeItemForFavoriteModal));
+            }
+        });
+
+        showFavoritesBtn.addEventListener('click', () => {
+            isShowingFavorites = !isShowingFavorites;
+            showFavoritesBtn.classList.toggle('active', isShowingFavorites);
+            if (isShowingFavorites) {
+                catalogTitle.textContent = "Mis Favoritos";
+            } else {
+                const configId = localStorage.getItem('lastScrapedConfigId');
+                const isCombined = JSON.parse(localStorage.getItem('lastViewWasCombined'));
+                 let configName = 'Mi Catálogo Web';
+                if (isCombined) configName = 'Catálogo Combinado';
+                else if (configId) {
+                    const config = configurations.find(c => c.id === configId);
+                    if (config) configName = config.name;
+                }
+                 catalogTitle.textContent = configName;
+            }
+            currentPage = 1;
+            displayGrid();
+            setupAutoUpdate();
+        });
+
+        modalBody.addEventListener('click', async e => {
+            const episodeBtn = e.target.closest('.episode-btn');
+            const continueBtn = e.target.closest('#continue-watching-banner button');
+
+            if (episodeBtn) {
+                await loadEpisode(episodeBtn.dataset.href, activeItemForFavoriteModal, episodeBtn);
+            }
+
+            if (continueBtn) {
+                const targetHref = continueBtn.dataset.href;
+                const correspondingEpisodeBtn = doc.querySelector(`.episode-btn[data-href="${targetHref}"]`);
+                if(correspondingEpisodeBtn) {
+                     doc.querySelectorAll('.episode-btn.active').forEach(b => b.classList.remove('active'));
+                     correspondingEpisodeBtn.classList.add('active');
+                }
+                await loadEpisode(targetHref, activeItemForFavoriteModal, correspondingEpisodeBtn);
+            }
+        });
+
+        // --- Secuencia de Carga Principal ---
+        async function initializeApp() {
+            loadConfigs();
+            loadFavorites();
+            loadViewingHistory();
+            populateConfigDropdown();
+            clearForm();
+            loadLastScrapedData();
+            await checkForNewEpisodesOnStartup();
+        }
+
+        initializeApp();
+    });
     </script>
 </body>
 </html>
