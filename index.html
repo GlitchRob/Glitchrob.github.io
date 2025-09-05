@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asistente de Mapa Personal</title>
+    
+    <!-- Tailwind CSS para un diseño moderno y responsivo -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet.js para el mapa interactivo -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <style>
+        /* Asegura que el mapa ocupe toda la pantalla */
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+        }
+        #map {
+            height: 100vh;
+            width: 100vw;
+            z-index: 10;
+        }
+        /* Estilos para el panel de alertas y notificaciones */
+        .notification {
+            transition: transform 0.5s ease-in-out, opacity 0.5s ease-in-out;
+            transform: translateY(-200%);
+            opacity: 0;
+            pointer-events: none;
+        }
+        .notification.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <!-- Contenedor principal del mapa -->
+    <div id="map"></div>
+
+    <!-- Panel de estado de geolocalización -->
+    <div id="geolocation-status-panel" class="hidden absolute top-0 left-0 right-0 z-20 bg-red-600 text-white p-4 text-center shadow-lg">
+        <p id="geolocation-status-text" class="font-semibold mb-2"></p>
+        <p id="geolocation-status-subtext" class="text-sm mb-3"></p>
+        <button id="retry-geolocation-btn" class="bg-white text-red-600 font-bold py-2 px-4 rounded-md hover:bg-red-100 transition-colors">Reintentar</button>
+    </div>
+
+    <!-- Panel flotante para la UI -->
+    <div id="ui-panel" class="absolute top-4 left-4 z-20 bg-white p-4 rounded-lg shadow-xl w-11/12 max-w-sm mt-0 transition-all duration-300">
+        <div class="flex justify-between items-center mb-3">
+            <h1 class="text-xl font-bold text-gray-800">Mis Alertas</h1>
+            <button id="toggle-help" class="p-2 rounded-full bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </button>
+        </div>
+        <p id="help-text" class="text-sm text-gray-600 mb-4 hidden">Toca cualquier lugar en el mapa para agregar una nueva alerta. Las alertas activas se mostrarán aquí.</p>
+        <div id="alert-list-container" class="max-h-60 overflow-y-auto">
+            <p id="no-alerts-message" class="text-gray-500 text-center py-4">Aún no hay alertas.</p>
+            <ul id="alert-list" class="space-y-2">
+                <!-- Las alertas se insertarán aquí dinámicamente -->
+            </ul>
+        </div>
+    </div>
+
+    <!-- Modal para agregar una nueva alerta -->
+    <div id="add-alert-modal" class="hidden absolute inset-0 z-30 bg-black bg-opacity-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm">
+            <h2 class="text-lg font-bold mb-4">Nombrar Alerta</h2>
+            <p class="text-sm text-gray-600 mb-4">Dale un nombre a esta ubicación para identificarla fácilmente.</p>
+            <input type="text" id="alert-name-input" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ej: Casa, Oficina, Supermercado">
+            <div class="mt-6 flex justify-end space-x-3">
+                <button id="cancel-add-alert" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancelar</button>
+                <button id="confirm-add-alert" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Guardar</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Banner de notificación de proximidad -->
+    <div id="proximity-notification" class="notification absolute top-4 left-1/2 -translate-x-1/2 z-40 bg-green-500 text-white font-bold py-3 px-6 rounded-lg shadow-xl w-11/12 max-w-md text-center">
+        <p id="notification-text"></p>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- CONSTANTES DE UI ---
+            const mapElement = document.getElementById('map');
+            const alertList = document.getElementById('alert-list');
+            const noAlertsMessage = document.getElementById('no-alerts-message');
+            const addAlertModal = document.getElementById('add-alert-modal');
+            const alertNameInput = document.getElementById('alert-name-input');
+            const confirmAddAlertBtn = document.getElementById('confirm-add-alert');
+            const cancelAddAlertBtn = document.getElementById('cancel-add-alert');
+            const proximityNotification = document.getElementById('proximity-notification');
+            const notificationText = document.getElementById('notification-text');
+            const toggleHelpBtn = document.getElementById('toggle-help');
+            const helpText = document.getElementById('help-text');
+            const geolocationStatusPanel = document.getElementById('geolocation-status-panel');
+            const geolocationStatusText = document.getElementById('geolocation-status-text');
+            const geolocationStatusSubtext = document.getElementById('geolocation-status-subtext');
+            const retryGeolocationBtn = document.getElementById('retry-geolocation-btn');
+            const uiPanel = document.getElementById('ui-panel');
+
+            // --- ESTADO DE LA APLICACIÓN ---
+            let userMarker = null;
+            let tempCoords = null;
+            let alerts = [];
+            let map;
+
+            // --- INICIALIZACIÓN ---
+            function initializeMap() {
+                map = L.map(mapElement).setView([14.6349, -90.5069], 13);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                }).addTo(map);
+
+                map.on('click', onMapClick);
+            }
+            
+            initializeMap();
+            loadAlertsFromLocalStorage();
+            startGeolocation();
+
+            // --- GEOLOCALIZACIÓN ---
+            function startGeolocation() {
+                if (!('geolocation' in navigator)) {
+                    showGeolocationError("Geolocalización no disponible", "Tu navegador no soporta esta función.");
+                    return;
+                }
+
+                navigator.geolocation.watchPosition(
+                    (position) => {
+                        hideGeolocationError();
+                        const { latitude, longitude } = position.coords;
+                        const userLatLng = [latitude, longitude];
+
+                        if (userMarker) {
+                            userMarker.setLatLng(userLatLng);
+                        } else {
+                            userMarker = L.marker(userLatLng, {
+                                icon: L.icon({
+                                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+                                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                                    iconSize: [25, 41], iconAnchor: [12, 41],
+                                    popupAnchor: [1, -34], shadowSize: [41, 41]
+                                })
+                            }).addTo(map).bindPopup("<b>¡Estás aquí!</b>");
+                            map.setView(userLatLng, 15);
+                        }
+                        checkProximity(userLatLng);
+                    },
+                    (error) => {
+                        let mainMessage, subMessage;
+                        switch (error.code) {
+                            case error.PERMISSION_DENIED:
+                                // **NUEVO: Detectar el error específico de origen no seguro**
+                                if (error.message.includes('secure origins')) {
+                                    mainMessage = "Error de Origen No Seguro";
+                                    subMessage = "Carga esta página desde HTTPS o 'localhost' para usar la geolocalización.";
+                                } else {
+                                    mainMessage = "Permiso de ubicación denegado.";
+                                    subMessage = "Por favor, permite el acceso a tu ubicación en la configuración del navegador.";
+                                }
+                                break;
+                            case error.POSITION_UNAVAILABLE:
+                                mainMessage = "Ubicación no disponible.";
+                                subMessage = "No se pudo determinar tu ubicación actual.";
+                                break;
+                            case error.TIMEOUT:
+                                mainMessage = "Tiempo de espera agotado.";
+                                subMessage = "La solicitud de ubicación tardó demasiado en responder.";
+                                break;
+                            default:
+                                mainMessage = "Error desconocido de geolocalización.";
+                                subMessage = "Ocurrió un error inesperado.";
+                                break;
+                        }
+                        console.error('Error de geolocalización:', error.code, error.message);
+                        showGeolocationError(mainMessage, subMessage);
+                    },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                );
+            }
+
+            function showGeolocationError(message, subMessage) {
+                geolocationStatusText.textContent = message;
+                geolocationStatusSubtext.textContent = subMessage;
+                geolocationStatusPanel.classList.remove('hidden');
+                uiPanel.style.marginTop = `${geolocationStatusPanel.offsetHeight}px`;
+            }
+
+            function hideGeolocationError() {
+                if (!geolocationStatusPanel.classList.contains('hidden')) {
+                    geolocationStatusPanel.classList.add('hidden');
+                    uiPanel.style.marginTop = '0px';
+                }
+            }
+
+            retryGeolocationBtn.addEventListener('click', () => {
+                hideGeolocationError();
+                startGeolocation();
+            });
+
+            // --- MANEJO DE ALERTAS ---
+            function onMapClick(e) {
+                tempCoords = e.latlng;
+                alertNameInput.value = '';
+                addAlertModal.classList.remove('hidden');
+                alertNameInput.focus();
+            }
+
+            confirmAddAlertBtn.addEventListener('click', () => {
+                const name = alertNameInput.value.trim();
+                if (name && tempCoords) {
+                    addAlert(name, tempCoords.lat, tempCoords.lng);
+                    tempCoords = null;
+                    addAlertModal.classList.add('hidden');
+                } else {
+                    showNotification('Por favor, ingresa un nombre para la alerta.', 'error');
+                }
+            });
+
+            cancelAddAlertBtn.addEventListener('click', () => {
+                addAlertModal.classList.add('hidden');
+                tempCoords = null;
+            });
+
+            function addAlert(name, lat, lng, id = Date.now()) {
+                const marker = L.marker([lat, lng]).addTo(map).bindPopup(`<b>${name}</b>`);
+                const circle = L.circle([lat, lng], {
+                    color: 'red', fillColor: '#f03', fillOpacity: 0.3, radius: 500
+                }).addTo(map);
+                alerts.push({ id, name, lat, lng, marker, circle });
+                renderAlertList();
+                saveAlertsToLocalStorage();
+            }
+
+            function removeAlert(id) {
+                const alertIndex = alerts.findIndex(a => a.id === id);
+                if (alertIndex > -1) {
+                    const alertToRemove = alerts[alertIndex];
+                    map.removeLayer(alertToRemove.marker);
+                    map.removeLayer(alertToRemove.circle);
+                    alerts.splice(alertIndex, 1);
+                    renderAlertList();
+                    saveAlertsToLocalStorage();
+                }
+            }
+
+            // --- RENDERIZADO Y UI ---
+            function renderAlertList() {
+                alertList.innerHTML = '';
+                noAlertsMessage.classList.toggle('hidden', alerts.length > 0);
+                alerts.forEach(alertData => {
+                    const li = document.createElement('li');
+                    li.className = 'flex justify-between items-center p-2 bg-gray-100 rounded-md';
+                    li.innerHTML = `
+                        <span class="text-gray-700 font-medium">${alertData.name}</span>
+                        <button data-id="${alertData.id}" class="delete-alert-btn p-1 text-red-500 hover:text-red-700 rounded-full hover:bg-red-100">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" /></svg>
+                        </button>`;
+                    alertList.appendChild(li);
+                });
+                document.querySelectorAll('.delete-alert-btn').forEach(btn => {
+                    btn.onclick = () => removeAlert(Number(btn.dataset.id));
+                });
+            }
+
+            toggleHelpBtn.addEventListener('click', () => helpText.classList.toggle('hidden'));
+
+            // --- LÓGICA DE PROXIMIDAD Y NOTIFICACIONES ---
+            function checkProximity(userLatLng) {
+                alerts.forEach(alertData => {
+                    const alertLatLng = L.latLng(alertData.lat, alertData.lng);
+                    if (map.distance(userLatLng, alertLatLng) <= 500) {
+                        if (!alertData.triggered) {
+                            showNotification(`¡Estás cerca de "${alertData.name}"!`);
+                            alertData.triggered = true;
+                        }
+                    } else {
+                        alertData.triggered = false;
+                    }
+                });
+            }
+
+            let notificationTimeout;
+            function showNotification(message, type = 'success') {
+                clearTimeout(notificationTimeout);
+                notificationText.textContent = message;
+                proximityNotification.className = 'notification absolute top-4 left-1/2 -translate-x-1/2 z-40 font-bold py-3 px-6 rounded-lg shadow-xl w-11/12 max-w-md text-center'; // Reset classes
+                if (type === 'error') {
+                    proximityNotification.classList.add('bg-red-500', 'text-white');
+                } else {
+                    proximityNotification.classList.add('bg-green-500', 'text-white');
+                }
+                proximityNotification.classList.add('show');
+                notificationTimeout = setTimeout(() => {
+                    proximityNotification.classList.remove('show');
+                }, 5000);
+            }
+
+            // --- PERSISTENCIA DE DATOS ---
+            function saveAlertsToLocalStorage() {
+                const alertsToSave = alerts.map(({ id, name, lat, lng }) => ({ id, name, lat, lng }));
+                localStorage.setItem('personalMapAlerts', JSON.stringify(alertsToSave));
+            }
+
+            function loadAlertsFromLocalStorage() {
+                const savedAlerts = JSON.parse(localStorage.getItem('personalMapAlerts'));
+                if (savedAlerts) {
+                    savedAlerts.forEach(a => addAlert(a.name, a.lat, a.lng, a.id));
+                }
+            }
+        });
+    </script>
+</body>
+</html>
