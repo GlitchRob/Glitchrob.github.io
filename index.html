@@ -63,10 +63,21 @@
 
         <section id="result-section" class="hidden space-y-4">
             <!-- Info básica del producto -->
-            <div id="product-display" class="hidden text-center p-4 bg-gray-700 rounded-lg">
+            <div id="product-display" class="hidden text-center p-4 bg-gray-700 rounded-lg relative">
                 <img id="product-image" src="" alt="Imagen del Producto" class="mx-auto my-2 rounded-lg w-28 h-28 object-contain bg-white p-1 shadow-md" onerror="this.src='https://placehold.co/128x128/ffffff/e0e0e0?text=Sin+Imagen'; this.onerror=null;">
+                <button id="edit-image-button" class="absolute top-4 right-4 bg-black/50 p-1.5 rounded-full text-white hover:bg-black/75">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pencil-fill" viewBox="0 0 16 16"><path d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708l-3-3zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207l6.5-6.5zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.5a.499.499 0 0 1-.175-.032l-.179.178a.5.5 0 0 0-.11.168l-2 5a.5.5 0 0 0 .65.65l5-2a.5.5 0 0 0 .168-.11l.178-.178z"/></svg>
+                </button>
                 <h3 id="product-name" class="text-xl font-bold text-white"></h3>
                 <p id="product-barcode" class="text-sm font-mono text-gray-400"></p>
+            </div>
+            
+            <!-- Modal para editar imagen -->
+            <div id="image-edit-options" class="hidden p-4 bg-gray-700/80 rounded-lg space-y-3">
+                 <h3 class="text-md font-semibold text-center text-gray-200">Actualizar Imagen</h3>
+                 <input type="text" id="image-url-input" placeholder="Pegar URL de la imagen" class="block w-full bg-gray-900 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                 <button id="upload-image-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Subir de Galería</button>
+                 <input type="file" id="image-file-input" class="hidden" accept="image/*">
             </div>
 
             <!-- Loader -->
@@ -82,9 +93,7 @@
             <!-- Comparación de precios (para productos existentes) -->
             <div id="price-comparison-section" class="hidden space-y-3">
                 <h2 class="text-lg font-semibold text-center text-indigo-300">Precios Guardados</h2>
-                <ul id="price-list" class="space-y-2">
-                    <!-- Los precios se insertarán aquí dinámicamente -->
-                </ul>
+                <ul id="price-list" class="space-y-2"></ul>
             </div>
 
             <!-- Formulario para agregar/actualizar precios -->
@@ -148,6 +157,11 @@
                 productImage: document.getElementById('product-image'),
                 productName: document.getElementById('product-name'),
                 productBarcode: document.getElementById('product-barcode'),
+                editImageButton: document.getElementById('edit-image-button'),
+                imageEditOptions: document.getElementById('image-edit-options'),
+                imageUrlInput: document.getElementById('image-url-input'),
+                uploadImageButton: document.getElementById('upload-image-button'),
+                imageFileInput: document.getElementById('image-file-input'),
                 loadingSpinner: document.getElementById('loading-spinner'),
                 notFound: document.getElementById('not-found'),
                 priceComparisonSection: document.getElementById('price-comparison-section'),
@@ -215,18 +229,10 @@
             };
             
             const showView = (view) => {
-                // Ocultar todo
-                dom.scannerSection.classList.add('hidden');
-                dom.resultSection.classList.add('hidden');
-                
-                if(view === 'scanner') {
-                    dom.scannerSection.classList.remove('hidden');
-                    dom.rescanButton.classList.add('hidden');
-                    dom.headerSubtitle.textContent = "Apunta la cámara al código de barras.";
-                } else if (view === 'results') {
-                    dom.resultSection.classList.remove('hidden');
-                    dom.rescanButton.classList.remove('hidden');
-                }
+                dom.scannerSection.classList.toggle('hidden', view !== 'scanner');
+                dom.resultSection.classList.toggle('hidden', view !== 'results');
+                dom.rescanButton.classList.toggle('hidden', view === 'scanner');
+                dom.headerSubtitle.textContent = view === 'scanner' ? "Apunta la cámara al código de barras." : `Código: ${currentBarcode}`;
             };
 
             const resetResultView = () => {
@@ -236,11 +242,43 @@
                 dom.priceComparisonSection.classList.add('hidden');
                 dom.addPriceForm.classList.add('hidden');
                 dom.manualNameContainer.classList.add('hidden');
+                dom.imageEditOptions.classList.add('hidden');
                 dom.manualProductName.value = '';
                 dom.priceInput.value = '';
                 dom.storeSelect.value = '';
+                dom.imageUrlInput.value = '';
+                dom.imageFileInput.value = ''; // Reset file input
             };
 
+            // --- IMAGE HANDLING ---
+            const updateProductImage = (barcode, imageUrl) => {
+                // For a product that is already saved in our local catalog
+                if (products[barcode]) {
+                    products[barcode].imageUrl = imageUrl;
+                    saveData();
+                } 
+                // For a new product that is not yet saved (exists in currentProductInfo)
+                else if (currentProductInfo) {
+                    currentProductInfo.imageUrl = imageUrl;
+                }
+                
+                // Update the displayed image regardless
+                dom.productImage.src = imageUrl;
+            };
+
+            const handleImageFileUpload = (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const base64Image = e.target.result;
+                        updateProductImage(currentBarcode, base64Image);
+                        dom.imageEditOptions.classList.add('hidden');
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+            
             // --- API & LOGIC ---
             const fetchProductInfo = async (barcode) => {
                 dom.loadingSpinner.classList.remove('hidden');
@@ -268,7 +306,6 @@
                 }
             };
              
-            // --- ✨ GEMINI API INTEGRATION ---
             const suggestNameWithAI = async (barcode) => {
                 dom.suggestNameButton.disabled = true;
                 dom.suggestButtonText.classList.add('hidden');
@@ -311,17 +348,14 @@
                 }
             };
 
-
             const handleScannedBarcode = async (barcode) => {
                 currentBarcode = barcode;
                 stopScanning();
-                showView('results');
                 resetResultView();
+                showView('results');
                 
-                dom.headerSubtitle.textContent = `Código: ${barcode}`;
-
+                // Case 1: Product is already in our local catalog
                 if (products[barcode]) {
-                    // Producto ya conocido en nuestro catálogo local
                     currentProductInfo = products[barcode];
                     dom.productName.textContent = currentProductInfo.name;
                     dom.productImage.src = currentProductInfo.imageUrl || 'https://placehold.co/128x128/ffffff/e0e0e0?text=Sin+Imagen';
@@ -330,18 +364,26 @@
                     renderPriceComparison(barcode);
                     dom.formTitle.textContent = "Actualizar o Agregar Precio";
                     dom.addPriceForm.classList.remove('hidden');
-                } else {
-                    // Producto nuevo, buscar online
+                } 
+                // Case 2: New product, try to find it online
+                else {
                     currentProductInfo = await fetchProductInfo(barcode);
+                    // Case 2a: Found online
                     if(currentProductInfo) {
-                        // Encontrado online
                         dom.productName.textContent = currentProductInfo.name;
                         dom.productImage.src = currentProductInfo.imageUrl || 'https://placehold.co/128x128/ffffff/e0e0e0?text=Sin+Imagen';
                         dom.productBarcode.textContent = barcode;
                         dom.productDisplay.classList.remove('hidden');
                         dom.formTitle.textContent = "Agregar Precio al Catálogo";
-                    } else {
-                        // No encontrado online, pedir datos manuales
+                    } 
+                    // Case 2b: Not found online, requires manual entry
+                    else {
+                        // Create a temporary object for the new product
+                        currentProductInfo = { name: '', imageUrl: null }; 
+                        dom.productImage.src = 'https://placehold.co/128x128/ffffff/e0e0e0?text=Añadir+Foto';
+                        dom.productName.textContent = "Producto Desconocido";
+                        dom.productBarcode.textContent = barcode;
+                        dom.productDisplay.classList.remove('hidden');
                         dom.notFound.classList.remove('hidden');
                         dom.manualNameContainer.classList.remove('hidden');
                         dom.formTitle.textContent = "Agregar Producto Manualmente";
@@ -369,16 +411,18 @@
                     return;
                 }
                 
+                // If the product is being created for the first time
                 if (!products[currentBarcode]) {
                     const manualName = dom.manualProductName.value.trim();
-                    if (!currentProductInfo && !manualName) {
+                    // If it wasn't found online (currentProductInfo.name is empty) and user didn't type a name
+                    if (!currentProductInfo.name && !manualName) {
                         alert("Por favor, ingresa el nombre del producto.");
                         return;
                     }
                     
                     products[currentBarcode] = {
-                        name: currentProductInfo ? currentProductInfo.name : manualName,
-                        imageUrl: currentProductInfo ? currentProductInfo.imageUrl : null,
+                        name: manualName || currentProductInfo.name,
+                        imageUrl: currentProductInfo.imageUrl,
                         prices: {},
                     };
                 }
@@ -386,11 +430,7 @@
                 products[currentBarcode].prices[store] = price;
                 saveData();
 
-                if (!dom.productDisplay.classList.contains('hidden')) {
-                     renderPriceComparison(currentBarcode);
-                } else {
-                    handleScannedBarcode(currentBarcode); 
-                }
+                renderPriceComparison(currentBarcode);
                
                 dom.priceInput.value = '';
                 dom.storeSelect.value = '';
@@ -406,9 +446,8 @@
 
             const startScanning = () => {
                 showView('scanner');
-                resetResultView();
-                dom.reader.classList.add('scanning');
                 const config = { fps: 10, qrbox: { width: 250, height: 150 }, rememberLastUsedCamera: true };
+                dom.reader.classList.add('scanning');
                 html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
                     .then(() => { isScanning = true; })
                     .catch(err => console.error("Camera start error:", err));
@@ -419,11 +458,11 @@
                     dom.reader.classList.remove('scanning');
                     html5QrCode.stop()
                         .then(() => { isScanning = false; })
-                        .catch(err => console.error("Scanner stop error:", err));
+                        .catch(err => {});
                 }
             };
 
-            // --- INITIALIZATION ---
+            // --- INITIALIZATION & EVENT LISTENERS ---
             const init = () => {
                 loadData();
                 updateStoreSelect();
@@ -432,7 +471,22 @@
                 dom.savePriceButton.addEventListener('click', savePrice);
                 dom.rescanButton.addEventListener('click', startScanning);
                 dom.suggestNameButton.addEventListener('click', () => suggestNameWithAI(currentBarcode));
-                
+                dom.editImageButton.addEventListener('click', () => {
+                    dom.imageEditOptions.classList.toggle('hidden');
+                });
+                dom.uploadImageButton.addEventListener('click', () => {
+                    dom.imageFileInput.click();
+                });
+                dom.imageFileInput.addEventListener('change', handleImageFileUpload);
+                dom.imageUrlInput.addEventListener('change', (e) => {
+                    const url = e.target.value.trim();
+                    if (url) {
+                        updateProductImage(currentBarcode, url);
+                        e.target.value = '';
+                        dom.imageEditOptions.classList.add('hidden');
+                    }
+                });
+
                 html5QrCode = new Html5Qrcode("reader");
                 startScanning();
             };
