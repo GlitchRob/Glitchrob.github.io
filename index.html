@@ -33,10 +33,6 @@
             100% { transform: translateY(0); }
         }
         #reader video { width: 100%; height: auto; display: block; }
-        /* Transiciones suaves */
-        .transition-all { transition: all 0.3s ease-in-out; }
-        .max-h-0 { max-height: 0; }
-        .max-h-screen { max-height: 100vh; }
         .spinner {
             border: 2px solid rgba(255, 255, 255, 0.3);
             border-top-color: #fff;
@@ -53,7 +49,7 @@
 <body class="bg-gray-900 text-white min-h-screen flex items-center justify-center p-4">
     <div class="w-full max-w-md mx-auto bg-gray-800 rounded-2xl shadow-2xl p-6 space-y-6">
         <header class="text-center">
-            <h1 class="text-3xl font-bold text-indigo-400">Comparador de Precios ✨</h1>
+            <h1 class="text-3xl font-bold text-indigo-400">Comparador Inteligente ✨</h1>
             <p id="header-subtitle" class="text-gray-400 mt-2">Apunta la cámara al código de barras.</p>
         </header>
 
@@ -70,9 +66,10 @@
                 </button>
                 <h3 id="product-name" class="text-xl font-bold text-white"></h3>
                 <p id="product-barcode" class="text-sm font-mono text-gray-400"></p>
+                <p id="product-category" class="text-xs text-purple-400 font-medium mt-1"></p>
+                <p id="category-loader" class="hidden text-xs text-purple-400 animate-pulse">Identificando categoría con IA...</p>
             </div>
             
-            <!-- Modal para editar imagen -->
             <div id="image-edit-options" class="hidden p-4 bg-gray-700/80 rounded-lg space-y-3">
                  <h3 class="text-md font-semibold text-center text-gray-200">Actualizar Imagen</h3>
                  <input type="text" id="image-url-input" placeholder="Pegar URL de la imagen" class="block w-full bg-gray-900 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
@@ -80,26 +77,29 @@
                  <input type="file" id="image-file-input" class="hidden" accept="image/*">
             </div>
 
-            <!-- Loader -->
             <div id="loading-spinner" class="hidden text-center">
                 <svg class="animate-spin h-8 w-8 text-white mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                 <p class="text-yellow-400 mt-2">Buscando información del producto...</p>
             </div>
-             <!-- Producto no encontrado -->
             <div id="not-found" class="hidden p-4 bg-red-900/50 rounded-lg text-center">
                 <p class="text-xl text-red-300">Producto no encontrado online. Puedes agregarlo manualmente.</p>
             </div>
 
-            <!-- Comparación de precios (para productos existentes) -->
+            <!-- Comparación de precios (mismo producto) -->
             <div id="price-comparison-section" class="hidden space-y-3">
-                <h2 class="text-lg font-semibold text-center text-indigo-300">Precios Guardados</h2>
+                <h2 class="text-lg font-semibold text-center text-indigo-300">Precios de este Producto</h2>
                 <ul id="price-list" class="space-y-2"></ul>
+            </div>
+            
+            <!-- NUEVO: Comparación de productos similares -->
+            <div id="similar-products-section" class="hidden space-y-3">
+                <h2 class="text-lg font-semibold text-center text-green-300">Alternativas Similares</h2>
+                <ul id="similar-products-list" class="space-y-2"></ul>
             </div>
 
             <!-- Formulario para agregar/actualizar precios -->
             <div id="add-price-form" class="hidden p-4 bg-gray-700/50 rounded-lg space-y-4">
                  <h2 id="form-title" class="text-lg font-semibold text-center text-indigo-300"></h2>
-                 <!-- Campo para nombre manual -->
                 <div id="manual-name-container" class="hidden">
                     <label for="manual-product-name" class="block text-sm font-medium text-gray-300">Nombre del Producto</label>
                     <div class="flex items-center gap-2 mt-1">
@@ -116,14 +116,12 @@
                 </div>
                 <div>
                     <label for="store-select" class="block text-sm font-medium text-gray-300">Tienda</label>
-                    <select id="store-select" class="mt-1 block w-full bg-gray-900 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                        <option value="">Selecciona una tienda</option>
-                    </select>
+                    <select id="store-select" class="mt-1 block w-full bg-gray-900 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"></select>
                 </div>
                 <button id="save-price-button" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-transform transform hover:scale-105">Guardar Precio</button>
             </div>
 
-            <!-- Formulario para agregar nueva tienda -->
+            <!-- Gestionar Tiendas -->
             <div id="add-store-section" class="p-4 bg-gray-700/50 rounded-lg space-y-3">
                  <h2 class="text-lg font-semibold text-center text-gray-300">Gestionar Tiendas</h2>
                  <div class="flex gap-2">
@@ -134,21 +132,15 @@
         </section>
 
         <footer class="flex justify-center">
-            <button id="rescan-button" class="hidden bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg transition-transform transform hover:scale-105">Escanear Otro</button>
+            <button id="rescan-button" class="hidden bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg">Escanear Otro</button>
         </footer>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // --- STATE MANAGEMENT ---
-            let stores = [];
-            let products = {};
-            let currentBarcode = null;
-            let currentProductInfo = null;
-            let html5QrCode;
-            let isScanning = false;
+            // --- STATE & DOM ---
+            let stores = [], products = {}, currentBarcode = null, currentProductInfo = null, html5QrCode, isScanning = false;
 
-            // --- DOM ELEMENTS ---
             const dom = {
                 scannerSection: document.getElementById('scanner-section'),
                 reader: document.getElementById('reader'),
@@ -157,6 +149,8 @@
                 productImage: document.getElementById('product-image'),
                 productName: document.getElementById('product-name'),
                 productBarcode: document.getElementById('product-barcode'),
+                productCategory: document.getElementById('product-category'),
+                categoryLoader: document.getElementById('category-loader'),
                 editImageButton: document.getElementById('edit-image-button'),
                 imageEditOptions: document.getElementById('image-edit-options'),
                 imageUrlInput: document.getElementById('image-url-input'),
@@ -166,6 +160,8 @@
                 notFound: document.getElementById('not-found'),
                 priceComparisonSection: document.getElementById('price-comparison-section'),
                 priceList: document.getElementById('price-list'),
+                similarProductsSection: document.getElementById('similar-products-section'),
+                similarProductsList: document.getElementById('similar-products-list'),
                 addPriceForm: document.getElementById('add-price-form'),
                 formTitle: document.getElementById('form-title'),
                 manualNameContainer: document.getElementById('manual-name-container'),
@@ -182,12 +178,11 @@
                 headerSubtitle: document.getElementById('header-subtitle'),
             };
 
-            // --- DATA PERSISTENCE (LocalStorage) ---
+            // --- DATA PERSISTENCE ---
             const saveData = () => {
                 localStorage.setItem('scanner_stores', JSON.stringify(stores));
                 localStorage.setItem('scanner_products', JSON.stringify(products));
             };
-
             const loadData = () => {
                 stores = JSON.parse(localStorage.getItem('scanner_stores')) || [];
                 products = JSON.parse(localStorage.getItem('scanner_products')) || {};
@@ -196,38 +191,63 @@
             // --- UI RENDERING ---
             const updateStoreSelect = () => {
                 dom.storeSelect.innerHTML = '<option value="">Selecciona una tienda</option>';
-                stores.forEach(store => {
-                    const option = document.createElement('option');
-                    option.value = store;
-                    option.textContent = store;
-                    dom.storeSelect.appendChild(option);
-                });
+                stores.forEach(store => dom.storeSelect.add(new Option(store, store)));
             };
-            
+
             const renderPriceComparison = (barcode) => {
                 const product = products[barcode];
-                if (!product || !product.prices || Object.keys(product.prices).length === 0) {
+                const prices = product?.prices || {};
+                if (Object.keys(prices).length === 0) {
                     dom.priceComparisonSection.classList.add('hidden');
                     return;
                 }
-
                 dom.priceList.innerHTML = '';
-                // Ordenar precios de menor a mayor
-                const sortedPrices = Object.entries(product.prices).sort(([, a], [, b]) => a - b);
-                
-                sortedPrices.forEach(([store, price], index) => {
-                    const li = document.createElement('li');
+                Object.entries(prices).sort(([, a], [, b]) => a - b).forEach(([store, price], index) => {
                     const isCheapest = index === 0;
+                    const li = document.createElement('li');
                     li.className = `flex justify-between items-center p-3 rounded-lg ${isCheapest ? 'bg-green-500/20 border border-green-500' : 'bg-gray-700'}`;
-                    li.innerHTML = `
-                        <span class="font-medium ${isCheapest ? 'text-green-300' : 'text-gray-300'}">${store}</span>
-                        <span class="font-bold text-xl ${isCheapest ? 'text-green-300' : 'text-white'}">MXN ${Number(price).toFixed(2)}</span>
-                    `;
+                    li.innerHTML = `<span class="font-medium ${isCheapest ? 'text-green-300' : ''}">${store}</span> <span class="font-bold text-xl ${isCheapest ? 'text-green-300' : ''}">MXN ${Number(price).toFixed(2)}</span>`;
                     dom.priceList.appendChild(li);
                 });
                 dom.priceComparisonSection.classList.remove('hidden');
             };
             
+            const getBestPrice = (prices) => {
+                if (!prices || Object.keys(prices).length === 0) return null;
+                const minPrice = Math.min(...Object.values(prices));
+                return `MXN ${minPrice.toFixed(2)}`;
+            };
+
+            const renderSimilarProducts = (category, currentBarcode) => {
+                if (!category) {
+                    dom.similarProductsSection.classList.add('hidden');
+                    return;
+                }
+                const similar = Object.entries(products).filter(([barcode, product]) => product.category === category && barcode !== currentBarcode);
+                
+                if (similar.length === 0) {
+                    dom.similarProductsSection.classList.add('hidden');
+                    return;
+                }
+
+                dom.similarProductsList.innerHTML = '';
+                similar.forEach(([barcode, product]) => {
+                    const bestPrice = getBestPrice(product.prices);
+                    const li = document.createElement('li');
+                    li.className = 'flex items-center gap-4 p-2 bg-gray-700 rounded-lg';
+                    li.innerHTML = `
+                        <img src="${product.imageUrl || 'https://placehold.co/64x64/ffffff/e0e0e0?text=?'}" class="w-16 h-16 object-contain rounded-md bg-white p-1">
+                        <div class="flex-1">
+                            <p class="font-semibold text-white">${product.name}</p>
+                            <p class="text-xs text-gray-400">Mejor Precio</p>
+                        </div>
+                        <p class="text-lg font-bold text-green-300">${bestPrice || 'N/A'}</p>
+                    `;
+                    dom.similarProductsList.appendChild(li);
+                });
+                dom.similarProductsSection.classList.remove('hidden');
+            };
+
             const showView = (view) => {
                 dom.scannerSection.classList.toggle('hidden', view !== 'scanner');
                 dom.resultSection.classList.toggle('hidden', view !== 'results');
@@ -236,33 +256,19 @@
             };
 
             const resetResultView = () => {
-                dom.productDisplay.classList.add('hidden');
-                dom.loadingSpinner.classList.add('hidden');
-                dom.notFound.classList.add('hidden');
-                dom.priceComparisonSection.classList.add('hidden');
-                dom.addPriceForm.classList.add('hidden');
-                dom.manualNameContainer.classList.add('hidden');
-                dom.imageEditOptions.classList.add('hidden');
-                dom.manualProductName.value = '';
-                dom.priceInput.value = '';
-                dom.storeSelect.value = '';
-                dom.imageUrlInput.value = '';
-                dom.imageFileInput.value = ''; // Reset file input
+                ['productDisplay', 'loadingSpinner', 'notFound', 'priceComparisonSection', 'similarProductsSection', 'addPriceForm', 'manualNameContainer', 'imageEditOptions', 'categoryLoader'].forEach(id => dom[id].classList.add('hidden'));
+                ['manualProductName', 'priceInput', 'storeSelect', 'imageUrlInput', 'imageFileInput', 'productCategory'].forEach(id => dom[id].value = '');
+                 dom.productCategory.textContent = '';
             };
 
             // --- IMAGE HANDLING ---
             const updateProductImage = (barcode, imageUrl) => {
-                // For a product that is already saved in our local catalog
                 if (products[barcode]) {
                     products[barcode].imageUrl = imageUrl;
                     saveData();
-                } 
-                // For a new product that is not yet saved (exists in currentProductInfo)
-                else if (currentProductInfo) {
+                } else if (currentProductInfo) {
                     currentProductInfo.imageUrl = imageUrl;
                 }
-                
-                // Update the displayed image regardless
                 dom.productImage.src = imageUrl;
             };
 
@@ -271,8 +277,7 @@
                 if (file) {
                     const reader = new FileReader();
                     reader.onload = (e) => {
-                        const base64Image = e.target.result;
-                        updateProductImage(currentBarcode, base64Image);
+                        updateProductImage(currentBarcode, e.target.result);
                         dom.imageEditOptions.classList.add('hidden');
                     };
                     reader.readAsDataURL(file);
@@ -284,20 +289,12 @@
                 dom.loadingSpinner.classList.remove('hidden');
                 try {
                     const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
-                    if (!response.ok) {
-                        console.warn('API request failed, but treating as "not found".');
-                        return null; 
-                    }
+                    if (!response.ok) return null;
                     const data = await response.json();
-                    
-                    if (data.status === 1 && data.product && data.product.product_name) {
-                        return {
-                            name: data.product.product_name,
-                            imageUrl: data.product.image_url || null,
-                        };
-                    } else {
-                        return null;
+                    if (data.status === 1 && data.product?.product_name) {
+                        return { name: data.product.product_name, imageUrl: data.product.image_url || null };
                     }
+                    return null;
                 } catch (error) {
                     console.error("API Error:", error);
                     return null;
@@ -305,46 +302,52 @@
                     dom.loadingSpinner.classList.add('hidden');
                 }
             };
-             
-            const suggestNameWithAI = async (barcode) => {
-                dom.suggestNameButton.disabled = true;
-                dom.suggestButtonText.classList.add('hidden');
-                dom.suggestSpinner.classList.remove('hidden');
-
-                const apiKey = ""; // Canvas will provide this
+            
+            // --- GEMINI API INTEGRATION ---
+            const callGemini = async (systemPrompt, userQuery) => {
+                 const apiKey = ""; // Canvas will provide this
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-
-                const systemPrompt = "Actúa como un experto en catalogación de productos de supermercado en México. Tu única tarea es sugerir un nombre corto y descriptivo para un producto, basándote en su código de barras. Proporciona solo el nombre del producto, sin explicaciones ni texto adicional.";
-                const userQuery = `El código de barras es: ${barcode}. Sugiere un nombre.`;
-
                 const payload = {
                     systemInstruction: { parts: [{ text: systemPrompt }] },
                     contents: [{ parts: [{ text: userQuery }] }],
                 };
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) throw new Error(`Gemini API request failed`);
+                const result = await response.json();
+                return result.candidates?.[0]?.content?.parts?.[0]?.text;
+            };
 
+            const suggestNameWithAI = async (barcode) => {
+                dom.suggestNameButton.disabled = true;
+                dom.suggestSpinner.classList.remove('hidden');
                 try {
-                    const response = await fetch(apiUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                    if (!response.ok) {
-                        throw new Error(`Gemini API request failed with status ${response.status}`);
-                    }
-                    const result = await response.json();
-                    const suggestedName = result.candidates?.[0]?.content?.parts?.[0]?.text;
-                    if (suggestedName) {
-                        dom.manualProductName.value = suggestedName.trim();
-                    } else {
-                        dom.manualProductName.value = "No se pudo sugerir un nombre.";
-                    }
+                    const systemPrompt = "Actúa como un experto en catalogación de productos de supermercado en México. Tu única tarea es sugerir un nombre corto y descriptivo para un producto, basándote en su código de barras. Proporciona solo el nombre del producto, sin explicaciones.";
+                    const suggestedName = await callGemini(systemPrompt, `El código de barras es: ${barcode}. Sugiere un nombre.`);
+                    dom.manualProductName.value = suggestedName ? suggestedName.trim() : "No se pudo sugerir un nombre.";
                 } catch (error) {
-                    console.error("Gemini API Error:", error);
-                    dom.manualProductName.value = "Error al sugerir nombre.";
+                    console.error("Gemini Name Suggestion Error:", error);
+                    dom.manualProductName.value = "Error al sugerir.";
                 } finally {
                     dom.suggestNameButton.disabled = false;
-                    dom.suggestButtonText.classList.remove('hidden');
                     dom.suggestSpinner.classList.add('hidden');
+                }
+            };
+
+            const getCategoryWithAI = async (productName) => {
+                dom.categoryLoader.classList.remove('hidden');
+                try {
+                    const systemPrompt = "Eres un experto en clasificación de productos de supermercado. Dada una descripción de producto, proporciona una categoría corta y precisa en español (máximo 3 palabras). Ejemplos: 'Refresco de Cola', 'Café Soluble', 'Botana Salada', 'Pan de Caja Blanco'. Responde únicamente con el nombre de la categoría.";
+                    const category = await callGemini(systemPrompt, `Producto: "${productName}"`);
+                    return category ? category.trim() : null;
+                } catch (error) {
+                    console.error("Gemini Category Error:", error);
+                    return null;
+                } finally {
+                    dom.categoryLoader.classList.add('hidden');
                 }
             };
 
@@ -354,40 +357,42 @@
                 resetResultView();
                 showView('results');
                 
-                // Case 1: Product is already in our local catalog
-                if (products[barcode]) {
-                    currentProductInfo = products[barcode];
-                    dom.productName.textContent = currentProductInfo.name;
-                    dom.productImage.src = currentProductInfo.imageUrl || 'https://placehold.co/128x128/ffffff/e0e0e0?text=Sin+Imagen';
+                let product = products[barcode];
+                if (product) {
+                    currentProductInfo = product;
+                    dom.productName.textContent = product.name;
+                    dom.productImage.src = product.imageUrl || 'https://placehold.co/128x128/ffffff/e0e0e0?text=Sin+Imagen';
+                    dom.productCategory.textContent = product.category || '';
                     dom.productBarcode.textContent = barcode;
                     dom.productDisplay.classList.remove('hidden');
                     renderPriceComparison(barcode);
+                    renderSimilarProducts(product.category, barcode);
                     dom.formTitle.textContent = "Actualizar o Agregar Precio";
                     dom.addPriceForm.classList.remove('hidden');
-                } 
-                // Case 2: New product, try to find it online
-                else {
-                    currentProductInfo = await fetchProductInfo(barcode);
-                    // Case 2a: Found online
-                    if(currentProductInfo) {
+                } else {
+                    currentProductInfo = await fetchProductInfo(barcode) || { name: '', imageUrl: null, category: null };
+                    
+                    if (currentProductInfo.name) {
                         dom.productName.textContent = currentProductInfo.name;
                         dom.productImage.src = currentProductInfo.imageUrl || 'https://placehold.co/128x128/ffffff/e0e0e0?text=Sin+Imagen';
-                        dom.productBarcode.textContent = barcode;
-                        dom.productDisplay.classList.remove('hidden');
                         dom.formTitle.textContent = "Agregar Precio al Catálogo";
-                    } 
-                    // Case 2b: Not found online, requires manual entry
-                    else {
-                        // Create a temporary object for the new product
-                        currentProductInfo = { name: '', imageUrl: null }; 
-                        dom.productImage.src = 'https://placehold.co/128x128/ffffff/e0e0e0?text=Añadir+Foto';
+                        
+                        // Get category for new product
+                        currentProductInfo.category = await getCategoryWithAI(currentProductInfo.name);
+                        if (currentProductInfo.category) {
+                            dom.productCategory.textContent = currentProductInfo.category;
+                            renderSimilarProducts(currentProductInfo.category, barcode);
+                        }
+                    } else {
                         dom.productName.textContent = "Producto Desconocido";
-                        dom.productBarcode.textContent = barcode;
-                        dom.productDisplay.classList.remove('hidden');
+                        dom.productImage.src = 'https://placehold.co/128x128/ffffff/e0e0e0?text=Añadir+Foto';
                         dom.notFound.classList.remove('hidden');
                         dom.manualNameContainer.classList.remove('hidden');
                         dom.formTitle.textContent = "Agregar Producto Manualmente";
                     }
+                    
+                    dom.productBarcode.textContent = barcode;
+                    dom.productDisplay.classList.remove('hidden');
                     dom.addPriceForm.classList.remove('hidden');
                 }
             };
@@ -402,7 +407,7 @@
                 }
             };
 
-            const savePrice = () => {
+            const savePrice = async () => {
                 const price = parseFloat(dom.priceInput.value);
                 const store = dom.storeSelect.value;
 
@@ -411,58 +416,55 @@
                     return;
                 }
                 
-                // If the product is being created for the first time
                 if (!products[currentBarcode]) {
                     const manualName = dom.manualProductName.value.trim();
-                    // If it wasn't found online (currentProductInfo.name is empty) and user didn't type a name
-                    if (!currentProductInfo.name && !manualName) {
+                    const finalName = manualName || currentProductInfo.name;
+                    if (!finalName) {
                         alert("Por favor, ingresa el nombre del producto.");
                         return;
                     }
+
+                    // If category was not identified before (e.g., manual entry), try now.
+                    if (!currentProductInfo.category && finalName) {
+                         currentProductInfo.category = await getCategoryWithAI(finalName);
+                         if (currentProductInfo.category) dom.productCategory.textContent = currentProductInfo.category;
+                    }
                     
                     products[currentBarcode] = {
-                        name: manualName || currentProductInfo.name,
+                        name: finalName,
                         imageUrl: currentProductInfo.imageUrl,
+                        category: currentProductInfo.category,
                         prices: {},
                     };
                 }
 
                 products[currentBarcode].prices[store] = price;
                 saveData();
-
                 renderPriceComparison(currentBarcode);
-               
+                renderSimilarProducts(products[currentBarcode].category, currentBarcode);
                 dom.priceInput.value = '';
                 dom.storeSelect.value = '';
-                dom.formTitle.textContent = "¡Precio Guardado! Agrega otro si quieres.";
+                dom.formTitle.textContent = "¡Precio Guardado!";
             };
 
             // --- SCANNER CONTROLS ---
-            const onScanSuccess = (decodedText, decodedResult) => {
-                if (isScanning) {
-                    handleScannedBarcode(decodedText);
-                }
-            };
-
+            const onScanSuccess = (decodedText) => { if (isScanning) handleScannedBarcode(decodedText); };
             const startScanning = () => {
                 showView('scanner');
                 const config = { fps: 10, qrbox: { width: 250, height: 150 }, rememberLastUsedCamera: true };
                 dom.reader.classList.add('scanning');
                 html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
-                    .then(() => { isScanning = true; })
+                    .then(() => isScanning = true)
                     .catch(err => console.error("Camera start error:", err));
             };
-
             const stopScanning = () => {
                 if (isScanning && html5QrCode.isScanning) {
                     dom.reader.classList.remove('scanning');
-                    html5QrCode.stop()
-                        .then(() => { isScanning = false; })
-                        .catch(err => {});
+                    html5QrCode.stop().then(() => isScanning = false).catch(err => {});
                 }
             };
 
-            // --- INITIALIZATION & EVENT LISTENERS ---
+            // --- INITIALIZATION ---
             const init = () => {
                 loadData();
                 updateStoreSelect();
@@ -471,12 +473,8 @@
                 dom.savePriceButton.addEventListener('click', savePrice);
                 dom.rescanButton.addEventListener('click', startScanning);
                 dom.suggestNameButton.addEventListener('click', () => suggestNameWithAI(currentBarcode));
-                dom.editImageButton.addEventListener('click', () => {
-                    dom.imageEditOptions.classList.toggle('hidden');
-                });
-                dom.uploadImageButton.addEventListener('click', () => {
-                    dom.imageFileInput.click();
-                });
+                dom.editImageButton.addEventListener('click', () => dom.imageEditOptions.classList.toggle('hidden'));
+                dom.uploadImageButton.addEventListener('click', () => dom.imageFileInput.click());
                 dom.imageFileInput.addEventListener('change', handleImageFileUpload);
                 dom.imageUrlInput.addEventListener('change', (e) => {
                     const url = e.target.value.trim();
