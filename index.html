@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comparador de Precios con IA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        #reader {
+            width: 100%;
+            border-radius: 0.75rem;
+            border: 2px solid #4f46e5;
+            overflow: hidden;
+            position: relative;
+        }
+        #reader.scanning::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: #ef4444;
+            box-shadow: 0 0 10px #ef4444;
+            animation: scanning 2s infinite linear;
+        }
+        @keyframes scanning {
+            0% { transform: translateY(0); }
+            50% { transform: translateY(calc(100% - 4px)); }
+            100% { transform: translateY(0); }
+        }
+        #reader video { width: 100%; height: auto; display: block; }
+        /* Transiciones suaves */
+        .transition-all { transition: all 0.3s ease-in-out; }
+        .max-h-0 { max-height: 0; }
+        .max-h-screen { max-height: 100vh; }
+        .spinner {
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-md mx-auto bg-gray-800 rounded-2xl shadow-2xl p-6 space-y-6">
+        <header class="text-center">
+            <h1 class="text-3xl font-bold text-indigo-400">Comparador de Precios ✨</h1>
+            <p id="header-subtitle" class="text-gray-400 mt-2">Apunta la cámara al código de barras.</p>
+        </header>
+
+        <main id="scanner-section">
+            <div id="reader" class="bg-gray-700"></div>
+        </main>
+
+        <section id="result-section" class="hidden space-y-4">
+            <!-- Info básica del producto -->
+            <div id="product-display" class="hidden text-center p-4 bg-gray-700 rounded-lg">
+                <img id="product-image" src="" alt="Imagen del Producto" class="mx-auto my-2 rounded-lg w-28 h-28 object-contain bg-white p-1 shadow-md" onerror="this.src='https://placehold.co/128x128/ffffff/e0e0e0?text=Sin+Imagen'; this.onerror=null;">
+                <h3 id="product-name" class="text-xl font-bold text-white"></h3>
+                <p id="product-barcode" class="text-sm font-mono text-gray-400"></p>
+            </div>
+
+            <!-- Loader -->
+            <div id="loading-spinner" class="hidden text-center">
+                <svg class="animate-spin h-8 w-8 text-white mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                <p class="text-yellow-400 mt-2">Buscando información del producto...</p>
+            </div>
+             <!-- Producto no encontrado -->
+            <div id="not-found" class="hidden p-4 bg-red-900/50 rounded-lg text-center">
+                <p class="text-xl text-red-300">Producto no encontrado online. Puedes agregarlo manualmente.</p>
+            </div>
+
+            <!-- Comparación de precios (para productos existentes) -->
+            <div id="price-comparison-section" class="hidden space-y-3">
+                <h2 class="text-lg font-semibold text-center text-indigo-300">Precios Guardados</h2>
+                <ul id="price-list" class="space-y-2">
+                    <!-- Los precios se insertarán aquí dinámicamente -->
+                </ul>
+            </div>
+
+            <!-- Formulario para agregar/actualizar precios -->
+            <div id="add-price-form" class="hidden p-4 bg-gray-700/50 rounded-lg space-y-4">
+                 <h2 id="form-title" class="text-lg font-semibold text-center text-indigo-300"></h2>
+                 <!-- Campo para nombre manual -->
+                <div id="manual-name-container" class="hidden">
+                    <label for="manual-product-name" class="block text-sm font-medium text-gray-300">Nombre del Producto</label>
+                    <div class="flex items-center gap-2 mt-1">
+                        <input type="text" id="manual-product-name" placeholder="Ej: Café 250g" class="block w-full bg-gray-900 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                        <button id="suggest-name-button" class="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-3 rounded-lg shrink-0 transition-all">
+                            <span id="suggest-button-text">✨ Sugerir</span>
+                            <div id="suggest-spinner" class="spinner hidden"></div>
+                        </button>
+                    </div>
+                </div>
+                <div>
+                    <label for="price-input" class="block text-sm font-medium text-gray-300">Precio (Q)</label>
+                    <input type="number" id="price-input" step="0.01" placeholder="Ej: 15.50" class="mt-1 block w-full bg-gray-900 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label for="store-select" class="block text-sm font-medium text-gray-300">Tienda</label>
+                    <select id="store-select" class="mt-1 block w-full bg-gray-900 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="">Selecciona una tienda</option>
+                    </select>
+                </div>
+                <button id="save-price-button" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-transform transform hover:scale-105">Guardar Precio</button>
+            </div>
+
+            <!-- Formulario para agregar nueva tienda -->
+            <div id="add-store-section" class="p-4 bg-gray-700/50 rounded-lg space-y-3">
+                 <h2 class="text-lg font-semibold text-center text-gray-300">Gestionar Tiendas</h2>
+                 <div class="flex gap-2">
+                    <input type="text" id="new-store-input" placeholder="Nombre de la nueva tienda" class="block w-full bg-gray-900 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    <button id="add-store-button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shrink-0">+</button>
+                 </div>
+            </div>
+        </section>
+
+        <footer class="flex justify-center">
+            <button id="rescan-button" class="hidden bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg transition-transform transform hover:scale-105">Escanear Otro</button>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- STATE MANAGEMENT ---
+            let stores = [];
+            let products = {};
+            let currentBarcode = null;
+            let currentProductInfo = null;
+            let html5QrCode;
+            let isScanning = false;
+
+            // --- DOM ELEMENTS ---
+            const dom = {
+                scannerSection: document.getElementById('scanner-section'),
+                reader: document.getElementById('reader'),
+                resultSection: document.getElementById('result-section'),
+                productDisplay: document.getElementById('product-display'),
+                productImage: document.getElementById('product-image'),
+                productName: document.getElementById('product-name'),
+                productBarcode: document.getElementById('product-barcode'),
+                loadingSpinner: document.getElementById('loading-spinner'),
+                notFound: document.getElementById('not-found'),
+                priceComparisonSection: document.getElementById('price-comparison-section'),
+                priceList: document.getElementById('price-list'),
+                addPriceForm: document.getElementById('add-price-form'),
+                formTitle: document.getElementById('form-title'),
+                manualNameContainer: document.getElementById('manual-name-container'),
+                manualProductName: document.getElementById('manual-product-name'),
+                suggestNameButton: document.getElementById('suggest-name-button'),
+                suggestButtonText: document.getElementById('suggest-button-text'),
+                suggestSpinner: document.getElementById('suggest-spinner'),
+                priceInput: document.getElementById('price-input'),
+                storeSelect: document.getElementById('store-select'),
+                savePriceButton: document.getElementById('save-price-button'),
+                newStoreInput: document.getElementById('new-store-input'),
+                addStoreButton: document.getElementById('add-store-button'),
+                rescanButton: document.getElementById('rescan-button'),
+                headerSubtitle: document.getElementById('header-subtitle'),
+            };
+
+            // --- DATA PERSISTENCE (LocalStorage) ---
+            const saveData = () => {
+                localStorage.setItem('scanner_stores', JSON.stringify(stores));
+                localStorage.setItem('scanner_products', JSON.stringify(products));
+            };
+
+            const loadData = () => {
+                stores = JSON.parse(localStorage.getItem('scanner_stores')) || [];
+                products = JSON.parse(localStorage.getItem('scanner_products')) || {};
+            };
+
+            // --- UI RENDERING ---
+            const updateStoreSelect = () => {
+                dom.storeSelect.innerHTML = '<option value="">Selecciona una tienda</option>';
+                stores.forEach(store => {
+                    const option = document.createElement('option');
+                    option.value = store;
+                    option.textContent = store;
+                    dom.storeSelect.appendChild(option);
+                });
+            };
+            
+            const renderPriceComparison = (barcode) => {
+                const product = products[barcode];
+                if (!product || !product.prices || Object.keys(product.prices).length === 0) {
+                    dom.priceComparisonSection.classList.add('hidden');
+                    return;
+                }
+
+                dom.priceList.innerHTML = '';
+                // Ordenar precios de menor a mayor
+                const sortedPrices = Object.entries(product.prices).sort(([, a], [, b]) => a - b);
+                
+                sortedPrices.forEach(([store, price], index) => {
+                    const li = document.createElement('li');
+                    const isCheapest = index === 0;
+                    li.className = `flex justify-between items-center p-3 rounded-lg ${isCheapest ? 'bg-green-500/20 border border-green-500' : 'bg-gray-700'}`;
+                    li.innerHTML = `
+                        <span class="font-medium ${isCheapest ? 'text-green-300' : 'text-gray-300'}">${store}</span>
+                        <span class="font-bold text-xl ${isCheapest ? 'text-green-300' : 'text-white'}">Q ${Number(price).toFixed(2)}</span>
+                    `;
+                    dom.priceList.appendChild(li);
+                });
+                dom.priceComparisonSection.classList.remove('hidden');
+            };
+            
+            const showView = (view) => {
+                // Ocultar todo
+                dom.scannerSection.classList.add('hidden');
+                dom.resultSection.classList.add('hidden');
+                
+                if(view === 'scanner') {
+                    dom.scannerSection.classList.remove('hidden');
+                    dom.rescanButton.classList.add('hidden');
+                    dom.headerSubtitle.textContent = "Apunta la cámara al código de barras.";
+                } else if (view === 'results') {
+                    dom.resultSection.classList.remove('hidden');
+                    dom.rescanButton.classList.remove('hidden');
+                }
+            };
+
+            const resetResultView = () => {
+                dom.productDisplay.classList.add('hidden');
+                dom.loadingSpinner.classList.add('hidden');
+                dom.notFound.classList.add('hidden');
+                dom.priceComparisonSection.classList.add('hidden');
+                dom.addPriceForm.classList.add('hidden');
+                dom.manualNameContainer.classList.add('hidden');
+                dom.manualProductName.value = '';
+                dom.priceInput.value = '';
+                dom.storeSelect.value = '';
+            };
+
+            // --- API & LOGIC ---
+            const fetchProductInfo = async (barcode) => {
+                dom.loadingSpinner.classList.remove('hidden');
+                try {
+                    const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+                    if (!response.ok) {
+                        console.warn('API request failed, but treating as "not found".');
+                        return null; 
+                    }
+                    const data = await response.json();
+                    
+                    if (data.status === 1 && data.product && data.product.product_name) {
+                        return {
+                            name: data.product.product_name,
+                            imageUrl: data.product.image_url || null,
+                        };
+                    } else {
+                        return null;
+                    }
+                } catch (error) {
+                    console.error("API Error:", error);
+                    return null;
+                } finally {
+                    dom.loadingSpinner.classList.add('hidden');
+                }
+            };
+             
+            // --- ✨ GEMINI API INTEGRATION ---
+            const suggestNameWithAI = async (barcode) => {
+                dom.suggestNameButton.disabled = true;
+                dom.suggestButtonText.classList.add('hidden');
+                dom.suggestSpinner.classList.remove('hidden');
+
+                const apiKey = ""; // Canvas will provide this
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+                const systemPrompt = "Actúa como un experto en catalogación de productos de supermercado en Guatemala. Tu única tarea es sugerir un nombre corto y descriptivo para un producto, basándote en su código de barras. Proporciona solo el nombre del producto, sin explicaciones ni texto adicional.";
+                const userQuery = `El código de barras es: ${barcode}. Sugiere un nombre.`;
+
+                const payload = {
+                    systemInstruction: { parts: [{ text: systemPrompt }] },
+                    contents: [{ parts: [{ text: userQuery }] }],
+                };
+
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!response.ok) {
+                        throw new Error(`Gemini API request failed with status ${response.status}`);
+                    }
+                    const result = await response.json();
+                    const suggestedName = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (suggestedName) {
+                        dom.manualProductName.value = suggestedName.trim();
+                    } else {
+                        dom.manualProductName.value = "No se pudo sugerir un nombre.";
+                    }
+                } catch (error) {
+                    console.error("Gemini API Error:", error);
+                    dom.manualProductName.value = "Error al sugerir nombre.";
+                } finally {
+                    dom.suggestNameButton.disabled = false;
+                    dom.suggestButtonText.classList.remove('hidden');
+                    dom.suggestSpinner.classList.add('hidden');
+                }
+            };
+
+
+            const handleScannedBarcode = async (barcode) => {
+                currentBarcode = barcode;
+                stopScanning();
+                showView('results');
+                resetResultView();
+                
+                dom.headerSubtitle.textContent = `Código: ${barcode}`;
+
+                if (products[barcode]) {
+                    // Producto ya conocido en nuestro catálogo local
+                    currentProductInfo = products[barcode];
+                    dom.productName.textContent = currentProductInfo.name;
+                    dom.productImage.src = currentProductInfo.imageUrl || 'https://placehold.co/128x128/ffffff/e0e0e0?text=Sin+Imagen';
+                    dom.productBarcode.textContent = barcode;
+                    dom.productDisplay.classList.remove('hidden');
+                    renderPriceComparison(barcode);
+                    dom.formTitle.textContent = "Actualizar o Agregar Precio";
+                    dom.addPriceForm.classList.remove('hidden');
+                } else {
+                    // Producto nuevo, buscar online
+                    currentProductInfo = await fetchProductInfo(barcode);
+                    if(currentProductInfo) {
+                        // Encontrado online
+                        dom.productName.textContent = currentProductInfo.name;
+                        dom.productImage.src = currentProductInfo.imageUrl || 'https://placehold.co/128x128/ffffff/e0e0e0?text=Sin+Imagen';
+                        dom.productBarcode.textContent = barcode;
+                        dom.productDisplay.classList.remove('hidden');
+                        dom.formTitle.textContent = "Agregar Precio al Catálogo";
+                    } else {
+                        // No encontrado online, pedir datos manuales
+                        dom.notFound.classList.remove('hidden');
+                        dom.manualNameContainer.classList.remove('hidden');
+                        dom.formTitle.textContent = "Agregar Producto Manualmente";
+                    }
+                    dom.addPriceForm.classList.remove('hidden');
+                }
+            };
+
+            const addStore = () => {
+                const newStoreName = dom.newStoreInput.value.trim();
+                if (newStoreName && !stores.includes(newStoreName)) {
+                    stores.push(newStoreName);
+                    saveData();
+                    updateStoreSelect();
+                    dom.newStoreInput.value = '';
+                }
+            };
+
+            const savePrice = () => {
+                const price = parseFloat(dom.priceInput.value);
+                const store = dom.storeSelect.value;
+
+                if (!currentBarcode || !store || isNaN(price) || price <= 0) {
+                    alert("Por favor, ingresa un precio válido y selecciona una tienda.");
+                    return;
+                }
+                
+                if (!products[currentBarcode]) {
+                    const manualName = dom.manualProductName.value.trim();
+                    if (!currentProductInfo && !manualName) {
+                        alert("Por favor, ingresa el nombre del producto.");
+                        return;
+                    }
+                    
+                    products[currentBarcode] = {
+                        name: currentProductInfo ? currentProductInfo.name : manualName,
+                        imageUrl: currentProductInfo ? currentProductInfo.imageUrl : null,
+                        prices: {},
+                    };
+                }
+
+                products[currentBarcode].prices[store] = price;
+                saveData();
+
+                if (!dom.productDisplay.classList.contains('hidden')) {
+                     renderPriceComparison(currentBarcode);
+                } else {
+                    handleScannedBarcode(currentBarcode); 
+                }
+               
+                dom.priceInput.value = '';
+                dom.storeSelect.value = '';
+                dom.formTitle.textContent = "¡Precio Guardado! Agrega otro si quieres.";
+            };
+
+            // --- SCANNER CONTROLS ---
+            const onScanSuccess = (decodedText, decodedResult) => {
+                if (isScanning) {
+                    handleScannedBarcode(decodedText);
+                }
+            };
+
+            const startScanning = () => {
+                showView('scanner');
+                resetResultView();
+                dom.reader.classList.add('scanning');
+                const config = { fps: 10, qrbox: { width: 250, height: 150 }, rememberLastUsedCamera: true };
+                html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
+                    .then(() => { isScanning = true; })
+                    .catch(err => console.error("Camera start error:", err));
+            };
+
+            const stopScanning = () => {
+                if (isScanning && html5QrCode.isScanning) {
+                    dom.reader.classList.remove('scanning');
+                    html5QrCode.stop()
+                        .then(() => { isScanning = false; })
+                        .catch(err => console.error("Scanner stop error:", err));
+                }
+            };
+
+            // --- INITIALIZATION ---
+            const init = () => {
+                loadData();
+                updateStoreSelect();
+                
+                dom.addStoreButton.addEventListener('click', addStore);
+                dom.savePriceButton.addEventListener('click', savePrice);
+                dom.rescanButton.addEventListener('click', startScanning);
+                dom.suggestNameButton.addEventListener('click', () => suggestNameWithAI(currentBarcode));
+                
+                html5QrCode = new Html5Qrcode("reader");
+                startScanning();
+            };
+
+            init();
+        });
+    </script>
+</body>
+</html>
+
