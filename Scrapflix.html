@@ -12,6 +12,13 @@
         body { font-family: 'Inter', sans-serif; background-color: #111827; }
         .modal { transition: opacity 0.3s ease-in-out; }
         .modal-content { transition: transform 0.3s ease-in-out; background-color: #1f2937; }
+        .modal-content.fullscreen-active {
+            width: 100vw;
+            height: 100vh;
+            max-width: 100vw;
+            max-height: 100vh;
+            border-radius: 0;
+        }
         .grid-poster { 
             position: relative;
             transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out; 
@@ -53,6 +60,19 @@
             background-color: #ef4444; color: white;
             padding: 2px 8px; border-radius: 9999px;
             font-size: 10px; font-weight: bold; z-index: 11;
+        }
+        .content-type-tag {
+            position: absolute;
+            bottom: 42px; /* Ajustado para estar sobre el título */
+            left: 8px;
+            background-color: rgba(17, 24, 39, 0.8);
+            color: #d1d5db;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            z-index: 9;
+            pointer-events: none;
         }
         #show-favorites-btn.active { background-color: #3b82f6; color: white; }
         #show-favorites-btn.active svg { fill: white; }
@@ -164,9 +184,18 @@
                         <select id="config-select" class="input-field w-full p-2.5 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"></select>
                     </div>
                     <div class="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
-                         <div>
-                            <label for="config-name" class="block text-sm font-medium text-gray-300 mb-1">Nombre</label>
-                            <input type="text" id="config-name" class="input-field w-full p-2 rounded-md" placeholder="Ej: Películas de Estreno">
+                         <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="config-name" class="block text-sm font-medium text-gray-300 mb-1">Nombre</label>
+                                <input type="text" id="config-name" class="input-field w-full p-2 rounded-md" placeholder="Ej: Películas de Estreno">
+                            </div>
+                            <div>
+                                <label for="config-type" class="block text-sm font-medium text-gray-300 mb-1">Tipo de Contenido</label>
+                                <select id="config-type" class="input-field w-full p-2.5 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                    <option value="unitario">Películas / Unitario</option>
+                                    <option value="serie">Series</option>
+                                </select>
+                            </div>
                         </div>
                         <div>
                             <label for="url" class="block text-sm font-medium text-gray-300 mb-1">URL de Listado (Página 1)</label>
@@ -279,6 +308,10 @@
             <div class="flex justify-between items-center p-4 border-b border-gray-700">
                 <h2 id="modal-title" class="text-xl font-bold text-white truncate pr-4"></h2>
                 <div class="flex items-center">
+                    <button id="fullscreen-modal-btn" class="text-gray-400 p-2 rounded-full hover:text-white">
+                        <svg id="fullscreen-icon-expand" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m0 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5h-4m0 0v-4m0 4l-5-5"></path></svg>
+                        <svg id="fullscreen-icon-compress" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-4-4m0 0l-4 4m4-4V3m0 11v4m-4-4H3m11 0h4m-4 4l4 4M5 15l4-4"></path></svg>
+                    </button>
                     <button id="modal-favorite-btn" class="text-gray-400 p-2 rounded-full">
                          <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24"><path d="M12.62 20.81C12.28 20.93 11.72 20.93 11.38 20.81C8.48 19.82 2 15.69 2 8.69C2 5.6 4.49 3.1 7.56 3.1C9.38 3.1 11.04 3.98 12 5.31C12.96 3.98 14.62 3.1 16.44 3.1C19.51 3.1 22 5.6 22 8.69C22 15.69 15.52 19.82 12.62 20.81Z"></path></svg>
                     </button>
@@ -349,6 +382,19 @@
             </div>
         </div>
     </div>
+    
+    <!-- Modal de Selección de Fuente de Búsqueda -->
+    <div id="search-source-modal" class="modal fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50 hidden opacity-0">
+        <div class="modal-content rounded-lg shadow-xl w-full max-w-md flex flex-col transform scale-95">
+            <div class="flex justify-between items-center p-4 border-b border-gray-700">
+                <h2 class="text-xl font-bold text-white">Seleccionar Fuente de Búsqueda</h2>
+                <button id="close-search-source-modal-btn" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
+            </div>
+            <div id="search-source-list" class="p-6 space-y-3 overflow-y-auto">
+                <!-- Las fuentes se agregarán aquí dinámicamente -->
+            </div>
+        </div>
+    </div>
 
 
     <!-- Contenido Principal -->
@@ -415,6 +461,7 @@
         const confirmExternalLinkModal = doc.getElementById('confirm-external-link-modal');
         const popupBlockedModal = doc.getElementById('popup-blocked-modal');
         const redirectConfirmModal = doc.getElementById('redirect-confirm-modal');
+        const searchSourceModal = doc.getElementById('search-source-modal');
         const openScraperBtn = doc.getElementById('open-scraper-modal-btn');
         const closeScraperBtn = doc.getElementById('close-scraper-modal-btn');
         const closeDetailsBtn = doc.getElementById('close-details-modal-btn');
@@ -422,13 +469,18 @@
         const closeConfirmLinkModalBtn = doc.getElementById('close-confirm-link-modal-btn');
         const closePopupBlockedModalBtn = doc.getElementById('close-popup-blocked-modal-btn');
         const closeRedirectConfirmModalBtn = doc.getElementById('close-redirect-confirm-modal-btn');
+        const closeSearchSourceModalBtn = doc.getElementById('close-search-source-modal-btn');
         // Contenido Modales
         const modalTitle = doc.getElementById('modal-title');
         const modalBody = doc.getElementById('modal-body');
         const modalFavoriteBtn = doc.getElementById('modal-favorite-btn');
+        const fullscreenModalBtn = doc.getElementById('fullscreen-modal-btn');
+        const fullscreenIconExpand = doc.getElementById('fullscreen-icon-expand');
+        const fullscreenIconCompress = doc.getElementById('fullscreen-icon-compress');
         // Formulario Scraper
         const configSelect = doc.getElementById('config-select');
         const configNameInput = doc.getElementById('config-name');
+        const configTypeSelect = doc.getElementById('config-type');
         const urlInput = doc.getElementById('url');
         const searchUrlInput = doc.getElementById('search-url');
         const searchPaginationPatternInput = doc.getElementById('search-pagination-pattern');
@@ -465,7 +517,7 @@
         const importErrorMsg = doc.getElementById('import-error-msg');
         const cancelImportBtn = doc.getElementById('cancel-import-btn');
         const confirmImportBtn = doc.getElementById('confirm-import-btn');
-        // Confirmaciones
+        // Confirmaciones y Selecciones
         const externalLinkUrl = doc.getElementById('external-link-url');
         const cancelExternalLinkBtn = doc.getElementById('cancel-external-link-btn');
         const confirmExternalLinkBtn = doc.getElementById('confirm-external-link-btn');
@@ -476,6 +528,7 @@
         const cancelRedirectConfirmBtn = doc.getElementById('cancel-redirect-confirm-btn');
         const confirmRedirectConfirmBtn = doc.getElementById('confirm-redirect-confirm-btn');
         const neverShowRedirectConfirmCheckbox = doc.getElementById('never-show-redirect-confirm');
+        const searchSourceList = doc.getElementById('search-source-list');
 
         // Estado de la aplicación
         let configurations = [];
@@ -560,16 +613,24 @@
             const savedKeys = JSON.parse(localStorage.getItem('knownItemKeys')) || [];
             knownItemKeys = new Set(savedKeys);
 
-            let configId = localStorage.getItem('lastScrapedConfigId');
-            const isCombined = JSON.parse(localStorage.getItem('lastViewWasCombined')) || false;
-            let configName = 'Mi Catálogo Web';
-            if (isCombined) {
-                configName = 'Catálogo Combinado';
-            } else if (configId) {
-                const config = configurations.find(c => c.id === configId);
-                if(config) configName = config.name;
+            const lastConfigId = localStorage.getItem('lastScrapedConfigId');
+            const isCombined = JSON.parse(localStorage.getItem('lastViewWasCombined'));
+            let newTitle = "Mi Catálogo Web";
+            
+            if (isShowingFavorites) {
+                newTitle = "Mis Favoritos";
+            } else if (backToCatalogBtn.classList.contains('hidden') === false) {
+                 newTitle = catalogTitle.textContent;
+            } else if (isCombined) {
+                newTitle = 'Catálogo Combinado';
+            } else if (lastConfigId) {
+                const config = configurations.find(c => c.id === lastConfigId);
+                if (config) {
+                     newTitle = config.contentType === 'serie' ? "Catálogo de Series" : "Catálogo de Películas";
+                }
             }
-            catalogTitle.textContent = configName;
+            catalogTitle.textContent = newTitle;
+            updatePageTitle(null, newTitle);
             displayGrid();
             setupAutoUpdate();
         };
@@ -688,8 +749,12 @@
                 
                 const favoriteData = favorites.get(getItemKey(item));
                 const newEpisodeBadge = (favoriteData && favoriteData.hasNewEpisode) ? `<div class="new-episode-badge">NUEVO</div>` : '';
+                
+                const contentType = item.contentType || 'unitario';
+                const typeName = contentType === 'serie' ? 'Serie' : 'Película';
+                const typeTagHTML = `<div class="content-type-tag">${typeName}</div>`;
 
-                poster.innerHTML = `${newEpisodeBadge}<img src="${item.imagen}" alt="${item.nombre}" class="w-full h-auto object-cover">${playOverlayHTML}<div class="p-2"><h4 class="text-sm font-semibold text-white truncate">${item.nombre}</h4></div>`;
+                poster.innerHTML = `${newEpisodeBadge}${typeTagHTML}<img src="${item.imagen}" alt="${item.nombre}" class="w-full h-auto object-cover">${playOverlayHTML}<div class="p-2"><h4 class="text-sm font-semibold text-white truncate">${item.nombre}</h4></div>`;
                 poster.appendChild(favButton);
                 poster.addEventListener('click', () => showItemDetails(item));
                 gridOutput.appendChild(poster);
@@ -713,7 +778,7 @@
                 displayGrid();
             }
 
-            doc.title = `${item.nombre} | ${originalPageTitle}`;
+            updatePageTitle(item);
             modalTitle.textContent = item.nombre;
             modalFavoriteBtn.classList.toggle('favorited', isFavorite(item));
             openModal(detailsModal);
@@ -895,7 +960,7 @@
             const synopsisContainer = doc.getElementById('chapter-synopsis-container');
 
             if (clickedBtn) {
-                doc.title = `${item.nombre} - ${clickedBtn.textContent.trim()} | ${originalPageTitle}`;
+                updatePageTitle(item, clickedBtn.textContent.trim());
             }
 
             videoArea.innerHTML = `<div class="absolute inset-0 flex items-center justify-center"><div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-400"></div></div>`;
@@ -956,6 +1021,22 @@
                 synopsisContainer.innerHTML = `<div class="text-center text-red-400 p-4">No se pudo cargar la sinopsis.</div>`;
             }
         }
+        
+        function updatePageTitle(item = null, contentTitle = null) {
+            let title;
+            if (item) {
+                const typeName = (item.contentType === 'serie') ? 'Serie' : 'Película';
+                title = `${typeName} - ${item.nombre}`;
+                if (contentTitle && item.contentType === 'serie') {
+                     title += ` - ${contentTitle}`;
+                }
+                 doc.title = `${title} | ${originalPageTitle}`;
+            } else if (contentTitle) {
+                doc.title = `${contentTitle} | ${originalPageTitle}`;
+            } else {
+                doc.title = originalPageTitle;
+            }
+        }
 
 
         // --- Lógica del Scraper y Combinación ---
@@ -985,7 +1066,9 @@
         };
         const clearForm = () => {
             currentConfigId = null;
-            configNameInput.value = ''; urlInput.value = ''; searchUrlInput.value = '';
+            configNameInput.value = ''; 
+            configTypeSelect.value = 'unitario';
+            urlInput.value = ''; searchUrlInput.value = '';
             searchPaginationPatternInput.value = ''; containerSelectorInput.value = '';
             pageCountInput.value = 1; paginationPatternInput.value = '';
             genreSelectorInput.value = ''; descriptionSelectorInput.value = '';
@@ -1004,7 +1087,9 @@
             const config = configurations.find(c => c.id === id);
             if (!config) return clearForm();
             currentConfigId = id;
-            configNameInput.value = config.name; urlInput.value = config.url; searchUrlInput.value = config.searchUrl || '';
+            configNameInput.value = config.name; 
+            configTypeSelect.value = config.contentType || 'unitario';
+            urlInput.value = config.url; searchUrlInput.value = config.searchUrl || '';
             searchPaginationPatternInput.value = config.searchPaginationPattern || '';
             containerSelectorInput.value = config.containerSelector;
             pageCountInput.value = config.pageCount || 1; paginationPatternInput.value = config.paginationPattern || '';
@@ -1029,10 +1114,13 @@
 
         const copiarConfiguracion = () => {
             if (!currentConfigId) return;
+            const sourceConfigId = currentConfigId;
             const originalName = configNameInput.value.trim();
             const newName = `Copia de ${originalName || 'configuración sin nombre'}`;
             const configData = {
-                name: newName, url: urlInput.value.trim(), searchUrl: searchUrlInput.value.trim(),
+                name: newName, 
+                contentType: configTypeSelect.value,
+                url: urlInput.value.trim(), searchUrl: searchUrlInput.value.trim(),
                 searchPaginationPattern: searchPaginationPatternInput.value.trim(),
                 containerSelector: containerSelectorInput.value.trim(), pageCount: parseInt(pageCountInput.value, 10) || 1,
                 paginationPattern: paginationPatternInput.value.trim(), genreSelector: genreSelectorInput.value.trim(),
@@ -1043,13 +1131,21 @@
             };
             const newConfig = { id: `config_${Date.now()}`, ...configData };
             configurations.push(newConfig);
-            saveConfigs(); populateConfigDropdown();
+            saveConfigs();
+            populateConfigDropdown();
             configSelect.value = newConfig.id;
             loadConfigIntoForm(newConfig.id);
+
+            const itemsToClone = originalScrapedData.filter(item => item.configId === sourceConfigId);
+            const clonedItems = itemsToClone.map(item => ({ ...item, configId: newConfig.id }));
+            
+            saveLastScrapedData(clonedItems, newConfig.id, false);
+            loadLastScrapedData(); 
+            closeModal(scraperModal);
         };
 
         const performScrape = async (config, searchMode = false, searchTerm = '') => {
-            let { url, containerSelector, fields, pageCount, paginationPattern, searchUrl, searchPaginationPattern, videoIndicatorSelector } = config;
+            let { url, containerSelector, fields, pageCount, paginationPattern, searchUrl, searchPaginationPattern, videoIndicatorSelector, contentType } = config;
             
             if (!containerSelector || (!url && !searchMode)) return [];
             
@@ -1087,7 +1183,7 @@
                     const docParser = new DOMParser();
                     const parsedDoc = docParser.parseFromString(html, 'text/html');
                     const pageData = Array.from(parsedDoc.querySelectorAll(containerSelector)).map(item => {
-                        const extracted = { configId: config.id };
+                        const extracted = { configId: config.id, contentType };
                         fields.forEach(field => {
                             const el = (field.selector.toLowerCase() === 'self') ? item : item.querySelector(field.selector);
                             if(el) {
@@ -1116,7 +1212,9 @@
             const name = configNameInput.value.trim();
             if (!name) return;
             const configData = {
-                name, url: urlInput.value.trim(), searchUrl: searchUrlInput.value.trim(),
+                name, 
+                contentType: configTypeSelect.value,
+                url: urlInput.value.trim(), searchUrl: searchUrlInput.value.trim(),
                 searchPaginationPattern: searchPaginationPatternInput.value.trim(),
                 containerSelector: containerSelectorInput.value.trim(), pageCount: parseInt(pageCountInput.value, 10) || 1,
                 paginationPattern: paginationPatternInput.value.trim(), genreSelector: genreSelectorInput.value.trim(),
@@ -1142,7 +1240,9 @@
         copyJsonBtn.addEventListener('click', () => {
             if (!currentConfigId && !configNameInput.value.trim()) return;
             const configData = {
-                name: configNameInput.value.trim(), url: urlInput.value.trim(), searchUrl: searchUrlInput.value.trim(),
+                name: configNameInput.value.trim(),
+                contentType: configTypeSelect.value,
+                url: urlInput.value.trim(), searchUrl: searchUrlInput.value.trim(),
                 searchPaginationPattern: searchPaginationPatternInput.value.trim(),
                 containerSelector: containerSelectorInput.value.trim(), pageCount: parseInt(pageCountInput.value, 10) || 1,
                 paginationPattern: paginationPatternInput.value.trim(), genreSelector: genreSelectorInput.value.trim(),
@@ -1225,6 +1325,7 @@
             const configId = currentConfigId || `config_${Date.now()}`;
             const currentFormData = {
                 id: configId, name: configName,
+                contentType: configTypeSelect.value,
                 url: urlInput.value.trim(), searchUrl: searchUrlInput.value.trim(),
                 searchPaginationPattern: searchPaginationPatternInput.value.trim(),
                 containerSelector: containerSelectorInput.value.trim(), pageCount: parseInt(pageCountInput.value, 10) || 1,
@@ -1250,25 +1351,59 @@
             combineBtn.disabled = false; extractBtn.disabled = false;
             closeModal(scraperModal);
         });
+
+        async function executeWebSearch(config, term) {
+            originalScrapedData = [...currentScrapedData];
+            searchWebBtn.innerHTML = `<svg class="w-5 h-5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+            
+            const searchResults = await performScrape(config, true, term);
+            
+            currentScrapedData = searchResults;
+            currentPage = 1;
+            searchTerm = '';
+            searchInput.value = '';
+            
+            const titleText = `Resultados para: "${term}" en ${config.name}`;
+            catalogTitle.textContent = titleText;
+            updatePageTitle(null, titleText);
+            displayGrid();
+
+            searchWebBtn.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>`;
+            
+            backToCatalogBtn.classList.remove('hidden');
+        }
+
         searchWebBtn.addEventListener('click', async () => {
             const term = searchInput.value.trim();
             if(!term) return;
-            const lastConfigId = localStorage.getItem('lastScrapedConfigId');
+
             const isCombined = JSON.parse(localStorage.getItem('lastViewWasCombined'));
-            if(isCombined || !lastConfigId) return;
-            const config = configurations.find(c => c.id === lastConfigId);
-            if(!config || !config.searchUrl) return;
-            originalScrapedData = [...currentScrapedData];
-            loader.classList.remove('hidden');
-            loaderText.textContent = `Buscando "${term}"...`;
-            const searchResults = await performScrape(config, true, term);
-            currentScrapedData = searchResults;
-            currentPage = 1; searchTerm = ''; searchInput.value = '';
-            catalogTitle.textContent = `Resultados para: "${term}"`;
-            displayGrid();
-            loader.classList.add('hidden'); loaderText.textContent = '';
-            backToCatalogBtn.classList.remove('hidden');
+
+            if (isCombined) {
+                const searchableConfigs = configurations.filter(c => c.searchUrl);
+                if (searchableConfigs.length === 0) { return; }
+                if (searchableConfigs.length === 1) {
+                    await executeWebSearch(searchableConfigs[0], term);
+                } else {
+                    searchSourceList.innerHTML = '';
+                    searchableConfigs.forEach(config => {
+                        const btn = doc.createElement('button');
+                        btn.className = 'btn-secondary w-full text-left p-3 rounded-md';
+                        btn.textContent = config.name;
+                        btn.dataset.configId = config.id;
+                        searchSourceList.appendChild(btn);
+                    });
+                    openModal(searchSourceModal);
+                }
+            } else {
+                const lastConfigId = localStorage.getItem('lastScrapedConfigId');
+                if (!lastConfigId) return;
+                const config = configurations.find(c => c.id === lastConfigId);
+                if (!config || !config.searchUrl) return;
+                await executeWebSearch(config, term);
+            }
         });
+
         backToCatalogBtn.addEventListener('click', () => {
             currentScrapedData = [...originalScrapedData];
             originalScrapedData = [];
@@ -1290,7 +1425,7 @@
         closeScraperBtn.addEventListener('click', () => closeModal(scraperModal));
         closeDetailsBtn.addEventListener('click', () => {
             closeModal(detailsModal);
-            doc.title = originalPageTitle;
+            updatePageTitle(null, catalogTitle.textContent);
         });
         addFieldBtn.addEventListener('click', () => createField());
         fieldsContainer.addEventListener('click', e => { if (e.target.closest('.remove-field-btn')) e.target.closest('.field-item').remove(); });
@@ -1463,6 +1598,22 @@
                 autoUpdateStatus.textContent = `Próxima actualización en ${minutes}:${seconds.toString().padStart(2, '0')}`;
             }, 1000);
         }
+        
+        function updatePageTitle(item = null, contentTitle = null) {
+            let title;
+            if (item) {
+                const typeName = (item.contentType === 'serie') ? 'Serie' : 'Película';
+                title = `${typeName} - ${item.nombre}`;
+                if (contentTitle && item.contentType === 'serie') {
+                     title += ` - ${contentTitle}`;
+                }
+                 doc.title = `${title} | ${originalPageTitle}`;
+            } else if (contentTitle) {
+                doc.title = `${contentTitle} | ${originalPageTitle}`;
+            } else {
+                doc.title = originalPageTitle;
+            }
+        }
 
         // --- Carga Inicial y Utilidades ---
         const savedAdBlockerState = localStorage.getItem('adBlockerEnabled');
@@ -1527,22 +1678,8 @@
         showFavoritesBtn.addEventListener('click', () => {
             isShowingFavorites = !isShowingFavorites;
             showFavoritesBtn.classList.toggle('active', isShowingFavorites);
-            if (isShowingFavorites) {
-                catalogTitle.textContent = "Mis Favoritos";
-            } else {
-                const configId = localStorage.getItem('lastScrapedConfigId');
-                const isCombined = JSON.parse(localStorage.getItem('lastViewWasCombined'));
-                 let configName = 'Mi Catálogo Web';
-                if (isCombined) configName = 'Catálogo Combinado';
-                else if (configId) {
-                    const config = configurations.find(c => c.id === configId);
-                    if (config) configName = config.name;
-                }
-                 catalogTitle.textContent = configName;
-            }
             currentPage = 1;
-            displayGrid();
-            setupAutoUpdate();
+            loadLastScrapedData();
         });
 
         modalBody.addEventListener('click', async e => {
@@ -1563,6 +1700,38 @@
                 await loadEpisode(targetHref, activeItemForFavoriteModal, correspondingEpisodeBtn);
             }
         });
+        
+        // --- Fullscreen Logic ---
+        function toggleFullScreen() {
+            if (!document.fullscreenElement) {
+                detailsModal.requestFullscreen().catch(err => {
+                    alert(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+        fullscreenModalBtn.addEventListener('click', toggleFullScreen);
+        doc.addEventListener('fullscreenchange', () => {
+            const isFullscreen = !!document.fullscreenElement;
+            detailsModal.querySelector('.modal-content').classList.toggle('fullscreen-active', isFullscreen);
+            fullscreenIconExpand.classList.toggle('hidden', isFullscreen);
+            fullscreenIconCompress.classList.toggle('hidden', !isFullscreen);
+        });
+
+        closeSearchSourceModalBtn.addEventListener('click', () => closeModal(searchSourceModal));
+        searchSourceList.addEventListener('click', async (e) => {
+            const target = e.target.closest('button');
+            if (target && target.dataset.configId) {
+                const configId = target.dataset.configId;
+                const config = configurations.find(c => c.id === configId);
+                const term = searchInput.value.trim();
+                if (config && term) {
+                    closeModal(searchSourceModal);
+                    await executeWebSearch(config, term);
+                }
+            }
+        });
 
         // --- Secuencia de Carga Principal ---
         async function initializeApp() {
@@ -1580,3 +1749,4 @@
     </script>
 </body>
 </html>
+
