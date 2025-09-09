@@ -175,6 +175,17 @@
                                 <span class="text-sm text-gray-400">minutos</span>
                             </div>
                         </div>
+                         <div class="space-y-2">
+                            <label for="element-blocker-toggle" class="flex items-center cursor-pointer">
+                                <div class="relative">
+                                    <input type="checkbox" id="element-blocker-toggle" class="toggle-checkbox sr-only">
+                                    <div class="toggle-bg block bg-gray-600 w-14 h-8 rounded-full"></div>
+                                    <div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition"></div>
+                                </div>
+                                <div class="ml-3 text-gray-200 font-medium">Bloqueador de Elementos</div>
+                            </label>
+                            <textarea id="element-blocker-rules" rows="3" class="textarea-field w-full p-2 rounded-md mt-2 text-sm" placeholder="Añade selectores CSS para ocultar, uno por línea. Ej: .ad-banner"></textarea>
+                        </div>
                     </div>
                 </div>
                 <!-- Columna de Configuración Individual -->
@@ -354,7 +365,7 @@
             <div class="flex justify-end items-center p-4 border-t border-gray-700 bg-gray-800 rounded-b-lg gap-4">
                 <button id="cancel-popup-blocked-btn" class="btn-secondary text-sm font-semibold py-2 px-4 rounded-md">Cancelar</button>
                 <button id="copy-popup-blocked-link-btn" class="btn-secondary text-sm font-semibold py-2 px-4 rounded-md">Copiar Enlace</button>
-                <button id="confirm-popup-blocked-btn" class="btn-primary font-bold py-2 px-6 rounded-md">Abrir</button>
+                <button id="confirm-popup-blocked-btn" class="btn-primary font-bold py-2 px-6 rounded-md">Abrir en Ventana Segura</button>
             </div>
         </div>
     </div>
@@ -378,7 +389,7 @@
             </div>
             <div class="flex justify-end items-center p-4 border-t border-gray-700 bg-gray-800 rounded-b-lg gap-4">
                 <button id="cancel-redirect-confirm-btn" class="btn-secondary text-sm font-semibold py-2 px-4 rounded-md">Cancelar</button>
-                <button id="confirm-redirect-confirm-btn" class="btn-danger font-bold py-2 px-6 rounded-md">Cargar de todos modos</button>
+                <button id="confirm-redirect-confirm-btn" class="btn-danger font-bold py-2 px-6 rounded-md">Cargar en Ventana Segura</button>
             </div>
         </div>
     </div>
@@ -393,6 +404,22 @@
             <div id="search-source-list" class="p-6 space-y-3 overflow-y-auto">
                 <!-- Las fuentes se agregarán aquí dinámicamente -->
             </div>
+        </div>
+    </div>
+
+    <!-- Contenedor de Iframe Seguro -->
+    <div id="iframe-container-modal" class="modal fixed inset-0 bg-black bg-opacity-90 flex flex-col p-4 z-[60] hidden opacity-0">
+        <div class="flex justify-between items-center p-2 bg-gray-800 rounded-t-lg">
+            <span id="iframe-url-display" class="text-sm text-gray-400 truncate ml-4"></span>
+            <div class="flex items-center gap-2">
+                <button id="open-iframe-in-new-tab-btn" class="icon-btn btn-secondary p-2 rounded-lg" title="Abrir en nueva pestaña">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                </button>
+                <button id="close-iframe-container-btn" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
+            </div>
+        </div>
+        <div class="flex-grow bg-gray-900 rounded-b-lg">
+            <iframe id="secure-iframe" class="w-full h-full border-0" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>
         </div>
     </div>
 
@@ -462,6 +489,7 @@
         const popupBlockedModal = doc.getElementById('popup-blocked-modal');
         const redirectConfirmModal = doc.getElementById('redirect-confirm-modal');
         const searchSourceModal = doc.getElementById('search-source-modal');
+        const iframeContainerModal = doc.getElementById('iframe-container-modal');
         const openScraperBtn = doc.getElementById('open-scraper-modal-btn');
         const closeScraperBtn = doc.getElementById('close-scraper-modal-btn');
         const closeDetailsBtn = doc.getElementById('close-details-modal-btn');
@@ -470,6 +498,7 @@
         const closePopupBlockedModalBtn = doc.getElementById('close-popup-blocked-modal-btn');
         const closeRedirectConfirmModalBtn = doc.getElementById('close-redirect-confirm-modal-btn');
         const closeSearchSourceModalBtn = doc.getElementById('close-search-source-modal-btn');
+        const closeIframeContainerBtn = doc.getElementById('close-iframe-container-btn');
         // Contenido Modales
         const modalTitle = doc.getElementById('modal-title');
         const modalBody = doc.getElementById('modal-body');
@@ -477,6 +506,9 @@
         const fullscreenModalBtn = doc.getElementById('fullscreen-modal-btn');
         const fullscreenIconExpand = doc.getElementById('fullscreen-icon-expand');
         const fullscreenIconCompress = doc.getElementById('fullscreen-icon-compress');
+        const iframeUrlDisplay = doc.getElementById('iframe-url-display');
+        const secureIframe = doc.getElementById('secure-iframe');
+        const openIframeInNewTabBtn = doc.getElementById('open-iframe-in-new-tab-btn');
         // Formulario Scraper
         const configSelect = doc.getElementById('config-select');
         const configNameInput = doc.getElementById('config-name');
@@ -512,6 +544,8 @@
         const redirectBlockerToggle = doc.getElementById('redirect-blocker-toggle');
         const autoUpdateToggle = doc.getElementById('auto-update-toggle');
         const autoUpdateIntervalInput = doc.getElementById('auto-update-interval');
+        const elementBlockerToggle = doc.getElementById('element-blocker-toggle');
+        const elementBlockerRulesTextarea = doc.getElementById('element-blocker-rules');
         // Importación
         const jsonInput = doc.getElementById('json-input');
         const importErrorMsg = doc.getElementById('import-error-msg');
@@ -543,6 +577,8 @@
         let isAdBlockerEnabled = true;
         let isPopupBlockerEnabled = true;
         let isRedirectBlockerEnabled = true;
+        let isElementBlockerEnabled = true;
+        let elementBlockerRules = [];
         let neverShowRedirectConfirm = false;
         let isAutoUpdateEnabled = false;
         let autoUpdateInterval = 5;
@@ -562,8 +598,13 @@
             'popcash.net', 'propellerads.com', 'yadro.ru'
         ];
 
-        // --- Bloqueador de Pop-ups ---
+        // --- Bloqueador de Pop-ups y Contenedor Seguro ---
         const originalWindowOpen = window.open;
+        function openInSecureIframe(url) {
+            iframeUrlDisplay.textContent = url;
+            secureIframe.src = url;
+            openModal(iframeContainerModal);
+        }
         window.open = function(...args) {
             if (isPopupBlockerEnabled) {
                 const url = args[0] || '';
@@ -571,7 +612,7 @@
                 popupBlockedUrl.textContent = url;
                 blockedPopupArgs = args;
                 openModal(popupBlockedModal);
-                return null; // Prevenir la apertura
+                return null;
             }
             return originalWindowOpen.apply(window, args);
         };
@@ -638,12 +679,12 @@
             modal.classList.remove('hidden');
             setTimeout(() => {
                 modal.classList.add('opacity-100');
-                modal.querySelector('.modal-content').classList.add('scale-100');
+                modal.querySelector('.modal-content, .flex-grow')?.classList.add('scale-100');
             }, 10);
         };
         const closeModal = (modal) => {
             modal.classList.remove('opacity-100');
-            modal.querySelector('.modal-content').classList.remove('scale-100');
+            modal.querySelector('.modal-content, .flex-grow')?.classList.remove('scale-100');
             setTimeout(() => modal.classList.add('hidden'), 300);
         };
         
@@ -808,6 +849,7 @@
                 .then(html => {
                     const parser = new DOMParser();
                     const detailDoc = parser.parseFromString(html, 'text/html');
+                    if(isElementBlockerEnabled) applyElementBlocker(detailDoc);
                     const config = configurations.find(c => c.id === item.configId);
                     let genres = '', description = '';
                     if (config) {
@@ -898,6 +940,7 @@
                 .then(html => {
                     const parser = new DOMParser();
                     const detailDoc = parser.parseFromString(html, 'text/html');
+                     if(isElementBlockerEnabled) applyElementBlocker(detailDoc);
                     let videoSrc = findVideoInScript(detailDoc);
                     if (!videoSrc) {
                         const config = configurations.find(c => c.id === item.configId);
@@ -922,15 +965,20 @@
 
             const videoContainer = doc.createElement('div');
             videoContainer.className = 'video-container';
-            const iframeEl = doc.createElement('iframe');
-            iframeEl.src = src;
-            iframeEl.setAttribute('frameborder', '0');
-            iframeEl.setAttribute('allow', 'autoplay; encrypted-media; fullscreen');
-            iframeEl.setAttribute('allowfullscreen', '');
+            const outerIframe = doc.createElement('iframe');
+            outerIframe.setAttribute('frameborder', '0');
+            outerIframe.setAttribute('allow', 'autoplay; encrypted-media; fullscreen');
+            outerIframe.setAttribute('allowfullscreen', '');
+            
             if (isRedirectBlockerEnabled && !forceUnsafe) {
-                iframeEl.setAttribute('sandbox', 'allow-scripts allow-fullscreen allow-same-origin');
+                 outerIframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms'); 
+                 const innerIframeHTML = `<style>body,html,iframe{margin:0;padding:0;height:100%;width:100%;border:0;overflow:hidden;}</style><iframe src="${src}" allowfullscreen="true" allow="autoplay; encrypted-media; fullscreen"></iframe>`;
+                 outerIframe.srcdoc = innerIframeHTML;
+            } else {
+                outerIframe.src = src;
             }
-            videoContainer.appendChild(iframeEl);
+
+            videoContainer.appendChild(outerIframe);
             container.innerHTML = '';
             container.appendChild(videoContainer);
         }
@@ -972,6 +1020,7 @@
                 const html = await response.text();
                 const parser = new DOMParser();
                 const detailDoc = parser.parseFromString(html, 'text/html');
+                if(isElementBlockerEnabled) applyElementBlocker(detailDoc);
                 const config = configurations.find(c => c.id === item.configId);
 
                 // Process Video
@@ -1182,6 +1231,7 @@
                     const html = await response.text();
                     const docParser = new DOMParser();
                     const parsedDoc = docParser.parseFromString(html, 'text/html');
+                    if(isElementBlockerEnabled) applyElementBlocker(parsedDoc);
                     const pageData = Array.from(parsedDoc.querySelectorAll(containerSelector)).map(item => {
                         const extracted = { configId: config.id, contentType };
                         fields.forEach(field => {
@@ -1351,7 +1401,7 @@
             combineBtn.disabled = false; extractBtn.disabled = false;
             closeModal(scraperModal);
         });
-
+        
         async function executeWebSearch(config, term) {
             originalScrapedData = [...currentScrapedData];
             searchWebBtn.innerHTML = `<svg class="w-5 h-5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
@@ -1459,8 +1509,8 @@
         closePopupBlockedModalBtn.addEventListener('click', () => closeModal(popupBlockedModal));
         cancelPopupBlockedBtn.addEventListener('click', () => closeModal(popupBlockedModal));
         confirmPopupBlockedBtn.addEventListener('click', () => {
-            if (blockedPopupArgs) {
-                originalWindowOpen.apply(window, blockedPopupArgs);
+             if (blockedPopupArgs) {
+                openInSecureIframe(blockedPopupArgs[0]);
             }
             closeModal(popupBlockedModal);
             blockedPopupArgs = null;
@@ -1494,14 +1544,34 @@
                 localStorage.setItem('neverShowRedirectConfirm', 'true');
             }
             if (unsafeIframeArgs) {
-                renderIframe(unsafeIframeArgs.src, unsafeIframeArgs.container, true);
+                openInSecureIframe(unsafeIframeArgs.src);
             }
             closeModal(redirectConfirmModal);
             unsafeIframeArgs = null;
-            neverShowRedirectConfirmCheckbox.checked = false; // Reset checkbox
+            neverShowRedirectConfirmCheckbox.checked = false;
         });
 
-        // --- Lógica de Actualización Automática ---
+        // --- Lógica de Actualización y Bloqueo de Elementos ---
+        const saveElementBlockerRules = () => {
+            localStorage.setItem('elementBlockerRules', JSON.stringify(elementBlockerRules));
+        }
+        const loadElementBlockerRules = () => {
+            const saved = localStorage.getItem('elementBlockerRules');
+            elementBlockerRules = saved ? JSON.parse(saved) : [];
+            elementBlockerRulesTextarea.value = elementBlockerRules.join('\n');
+        }
+        function applyElementBlocker(doc) {
+            if (!isElementBlockerEnabled || elementBlockerRules.length === 0) return;
+            elementBlockerRules.forEach(rule => {
+                if (rule.trim()) {
+                    try {
+                        doc.querySelectorAll(rule).forEach(el => el.remove());
+                    } catch (e) {
+                        console.warn(`Regla de bloqueo inválida: "${rule}"`, e);
+                    }
+                }
+            });
+        }
         async function getEpisodeCount(item) {
             if (!item.url || !item.configId) return 0;
             const config = configurations.find(c => c.id === item.configId);
@@ -1512,6 +1582,7 @@
                 const html = await response.text();
                 const parser = new DOMParser();
                 const detailDoc = parser.parseFromString(html, 'text/html');
+                if(isElementBlockerEnabled) applyElementBlocker(detailDoc);
                 return detailDoc.querySelectorAll(config.episodeButtonSelector).length;
             } catch (error) {
                 console.error(`Error al contar episodios para ${item.nombre}:`, error);
@@ -1668,6 +1739,18 @@
         const savedNeverShowRedirect = localStorage.getItem('neverShowRedirectConfirm');
         neverShowRedirectConfirm = savedNeverShowRedirect === 'true';
 
+        const savedElementBlockerState = localStorage.getItem('elementBlockerEnabled');
+        isElementBlockerEnabled = savedElementBlockerState === null ? true : JSON.parse(savedElementBlockerState);
+        elementBlockerToggle.checked = isElementBlockerEnabled;
+        elementBlockerToggle.addEventListener('change', () => {
+            isElementBlockerEnabled = elementBlockerToggle.checked;
+            localStorage.setItem('elementBlockerEnabled', JSON.stringify(isElementBlockerEnabled));
+        });
+        elementBlockerRulesTextarea.addEventListener('input', () => {
+            elementBlockerRules = elementBlockerRulesTextarea.value.split('\n').filter(rule => rule.trim() !== '');
+            saveElementBlockerRules();
+        });
+
         modalFavoriteBtn.addEventListener('click', () => {
             if (activeItemForFavoriteModal) {
                 toggleFavorite(activeItemForFavoriteModal);
@@ -1732,12 +1815,23 @@
                 }
             }
         });
+        
+        closeIframeContainerBtn.addEventListener('click', () => {
+            secureIframe.src = 'about:blank';
+            closeModal(iframeContainerModal);
+        });
+        openIframeInNewTabBtn.addEventListener('click', () => {
+             if (secureIframe.src && secureIframe.src !== 'about:blank') {
+                originalWindowOpen(secureIframe.src, '_blank', 'noopener,noreferrer');
+             }
+        });
 
         // --- Secuencia de Carga Principal ---
         async function initializeApp() {
             loadConfigs();
             loadFavorites();
             loadViewingHistory();
+            loadElementBlockerRules();
             populateConfigDropdown();
             clearForm();
             loadLastScrapedData();
@@ -1749,4 +1843,3 @@
     </script>
 </body>
 </html>
-
