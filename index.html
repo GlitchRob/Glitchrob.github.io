@@ -201,9 +201,8 @@
         <header class="sticky top-0 z-30 bg-gray-900 py-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
             <div>
                 <h1 id="main-title" class="text-3xl md:text-5xl font-bold text-white flex items-center">
-                    
-<img src="https://raw.githubusercontent.com/GlitchRob/Glitchrob.github.io/refs/heads/main/app_icon.png" width="30">
-                    <span>SCRAPFLIX</span>
+                    <img src="https://raw.githubusercontent.com/GlitchRob/Glitchrob.github.io/refs/heads/main/app_icon.png" width="50" style="margin-right: 5px;">
+<span>SCRAPFLIX</span>
                 </h1>
                 <h2 id="view-subtitle" class="text-lg text-gray-400 mt-1"></h2>
             </div>
@@ -613,6 +612,7 @@
         const displayFavorites = () => {
             lastMainView = 'favorites';
             viewSubtitle.textContent = "Mis Favoritos";
+            document.title = 'Mis Favoritos - SCRAPFLIX';
             favoritesFilterBtn.classList.add('active');
             recentlyAddedBtn.classList.remove('active');
             paginationControls.style.display = 'none';
@@ -771,80 +771,81 @@
         };
 
         const renderDetailViewFromData = (data, url) => {
-             const watchedMainUrls = getWatchedHistory().map(h => h.url);
-               const watchedEpisodes = getWatchedEpisodes();
-               const isFavorited = !!getFavorites()[url];
-               const favButtonText = isFavorited ? 'Quitar de Favoritos' : 'Añadir a Favoritos';
-               const favButtonClass = isFavorited ? 'bg-gray-600 hover:bg-gray-700' : 'bg-red-600 hover:bg-red-700';
-               let actionButtonsHTML = `<button id="detail-fav-btn" data-url="${url}" data-title="${data.title}" data-img="${data.posterSrc}" class="${favButtonClass} flex items-center justify-center gap-2 w-full text-white font-bold py-3 px-6 rounded-lg transition">${favButtonText}</button>`;
-               
-               if (!data.isSeries) {
-                   const isWatched = watchedMainUrls.includes(url);
-                   actionButtonsHTML += `<button id="watch-now-btn" data-movie-url="${url}" data-img-src="${data.posterSrc}" class="watch-now-btn ${isWatched ? 'watched' : ''} flex items-center justify-center gap-2 w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg transition">
-                                   <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                   <span>${isWatched ? 'Ver de Nuevo' : 'Ver Ahora'}</span><div class="spinner hidden ml-2"></div></button>`;
-               }
+            document.title = `${data.title} - SCRAPFLIX`;
+            const watchedMainUrls = getWatchedHistory().map(h => h.url);
+            const watchedEpisodes = getWatchedEpisodes();
+            const isFavorited = !!getFavorites()[url];
+            const favButtonText = isFavorited ? 'Quitar de Favoritos' : 'Añadir a Favoritos';
+            const favButtonClass = isFavorited ? 'bg-gray-600 hover:bg-gray-700' : 'bg-red-600 hover:bg-red-700';
+            let actionButtonsHTML = `<button id="detail-fav-btn" data-url="${url}" data-title="${data.title}" data-img="${data.posterSrc}" class="${favButtonClass} flex items-center justify-center gap-2 w-full text-white font-bold py-3 px-6 rounded-lg transition">${favButtonText}</button>`;
+            
+            if (!data.isSeries) {
+                const isWatched = watchedMainUrls.includes(url);
+                actionButtonsHTML += `<button id="watch-now-btn" data-movie-url="${url}" data-img-src="${data.posterSrc}" class="watch-now-btn ${isWatched ? 'watched' : ''} flex items-center justify-center gap-2 w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg transition">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                <span>${isWatched ? 'Ver de Nuevo' : 'Ver Ahora'}</span><div class="spinner hidden ml-2"></div></button>`;
+            }
 
-               const heroHTML = `
-                   <div class="detail-hero" style="background-image: url('${data.posterSrc}')">
-                         <div class="relative z-10 p-6 md:p-10 flex flex-col md:flex-row items-center gap-6 md:gap-10">
-                               <img src="${data.posterSrc}" alt="Poster" class="w-48 md:w-64 h-auto object-cover rounded-lg shadow-2xl flex-shrink-0">
-                               <div class="flex-grow text-center md:text-left">
-                                     <h1 class="text-3xl lg:text-5xl font-bold text-white mb-4">${data.title}</h1>
-                                     <h3 class="text-lg font-semibold text-gray-300 mt-6 mb-2">Sinopsis</h3>
-                                     <p class="text-gray-400 text-base leading-relaxed max-w-2xl">${data.synopsis}</p>
-                                     <div class="mt-6 flex flex-col sm:flex-row gap-3 max-w-sm mx-auto md:mx-0">${actionButtonsHTML}</div>
-                               </div>
-                         </div>
-                   </div>`;
+            const heroHTML = `
+                <div class="detail-hero" style="background-image: url('${data.posterSrc}')">
+                        <div class="relative z-10 p-6 md:p-10 flex flex-col md:flex-row items-center gap-6 md:gap-10">
+                            <img src="${data.posterSrc}" alt="Poster" class="w-48 md:w-64 h-auto object-cover rounded-lg shadow-2xl flex-shrink-0">
+                            <div class="flex-grow text-center md:text-left">
+                                    <h1 class="text-3xl lg:text-5xl font-bold text-white mb-4">${data.title}</h1>
+                                    <h3 class="text-lg font-semibold text-gray-300 mt-6 mb-2">Sinopsis</h3>
+                                    <p class="text-gray-400 text-base leading-relaxed max-w-2xl">${data.synopsis}</p>
+                                    <div class="mt-6 flex flex-col sm:flex-row gap-3 max-w-sm mx-auto md:mx-0">${actionButtonsHTML}</div>
+                            </div>
+                        </div>
+                </div>`;
 
-               let contentHTML = heroHTML;
+            let contentHTML = heroHTML;
 
-               contentHTML += `
-                <div id="gemini-analysis-section" class="mt-8" data-title="${data.title}" data-synopsis="${data.synopsis}">
-                    <h2 class="text-2xl font-bold text-white mb-4 flex items-center gap-2">
-                        <svg class="w-6 h-6 text-yellow-400" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.25a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0V3a.75.75 0 0 1 .75-.75ZM7.5 12a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0Zm12.75 4.5a.75.75 0 0 0 0-1.5h-3.5a.75.75 0 0 0 0 1.5h3.5ZM12 7.5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0V8.25A.75.75 0 0 1 12 7.5ZM4.75 12a.75.75 0 0 0-1.5 0h-3.5a.75.75 0 0 0 0 1.5h3.5a.75.75 0 0 0 1.5 0Z" /></svg>
-                        Análisis con IA
-                    </h2>
-                    <div class="flex flex-col sm:flex-row gap-3">
-                        <button id="gemini-synopsis-btn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition flex items-center justify-center gap-2">
-                            ✨ Generar Sinopsis Mejorada
-                        </button>
-                        <button id="gemini-recommend-btn" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition flex items-center justify-center gap-2">
-                            ✨ Encontrar Títulos Similares
-                        </button>
-                    </div>
-                    <div id="gemini-result-area" class="mt-4 p-4 bg-gray-800 border border-gray-700 rounded-lg hidden">
-                        <div id="gemini-spinner" class="spinner mx-auto" style="width: 2rem; height: 2rem; border-width: 3px;"></div>
-                        <pre id="gemini-result-text" class="text-gray-300 whitespace-pre-wrap font-sans"></pre>
-                    </div>
+            contentHTML += `
+            <div id="gemini-analysis-section" class="mt-8" data-title="${data.title}" data-synopsis="${data.synopsis}">
+                <h2 class="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                    <svg class="w-6 h-6 text-yellow-400" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.25a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0V3a.75.75 0 0 1 .75-.75ZM7.5 12a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0Zm12.75 4.5a.75.75 0 0 0 0-1.5h-3.5a.75.75 0 0 0 0 1.5h3.5ZM12 7.5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0V8.25A.75.75 0 0 1 12 7.5ZM4.75 12a.75.75 0 0 0-1.5 0h-3.5a.75.75 0 0 0 0 1.5h3.5a.75.75 0 0 0 1.5 0Z" /></svg>
+                    Análisis con IA
+                </h2>
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <button id="gemini-synopsis-btn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition flex items-center justify-center gap-2">
+                        ✨ Generar Sinopsis Mejorada
+                    </button>
+                    <button id="gemini-recommend-btn" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition flex items-center justify-center gap-2">
+                        ✨ Encontrar Títulos Similares
+                    </button>
                 </div>
-                `;
+                <div id="gemini-result-area" class="mt-4 p-4 bg-gray-800 border border-gray-700 rounded-lg hidden">
+                    <div id="gemini-spinner" class="spinner mx-auto" style="width: 2rem; height: 2rem; border-width: 3px;"></div>
+                    <pre id="gemini-result-text" class="text-gray-300 whitespace-pre-wrap font-sans"></pre>
+                </div>
+            </div>
+            `;
 
-               if (data.isSeries) {
-                   contentHTML += `<div class="bg-gray-800 rounded-lg p-4 md:p-6 border border-gray-700 mt-8">
-                       <div class="flex flex-wrap gap-2 mb-4 border-b border-gray-700 pb-4">${data.seasons.map((s, i) => `<button type="button" data-target="${s.id}" class="season-tab px-4 py-2 text-sm font-medium rounded-md bg-gray-700 hover:bg-red-700 transition ${i === 0 ? 'active' : ''}">${s.title}</button>`).join('')}</div>
-                       <div>${data.seasons.map((s, i) => `<div id="${s.id}" class="episode-pane grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 ${i === 0 ? 'active' : ''}">${s.episodes.map(ep => `<button type="button" data-episode-url="${ep.url}" data-img-src="${data.posterSrc}" class="episode-item ${watchedEpisodes[ep.url] ? 'watched' : ''} text-left p-3 bg-gray-900 hover:bg-gray-700 rounded-md transition border-l-4 border-transparent flex items-center justify-between"><span>${ep.title}</span><div class="spinner hidden ml-2"></div></button>`).join('')}</div>`).join('')}</div>
-                   </div>`;
-               }
-               
-               if (data.similarTitles && data.similarTitles.length > 0) {
-                   contentHTML += `<div class="mt-8">
-                       <h2 class="text-2xl font-bold text-white mb-4">Títulos Similares</h2>
-                       <div id="similar-titles-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6">
-                       </div>
-                   </div>`;
-               }
-               
-               detailContentArea.innerHTML = contentHTML;
+            if (data.isSeries) {
+                contentHTML += `<div class="bg-gray-800 rounded-lg p-4 md:p-6 border border-gray-700 mt-8">
+                    <div class="flex flex-wrap gap-2 mb-4 border-b border-gray-700 pb-4">${data.seasons.map((s, i) => `<button type="button" data-target="${s.id}" class="season-tab px-4 py-2 text-sm font-medium rounded-md bg-gray-700 hover:bg-red-700 transition ${i === 0 ? 'active' : ''}">${s.title}</button>`).join('')}</div>
+                    <div>${data.seasons.map((s, i) => `<div id="${s.id}" class="episode-pane grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 ${i === 0 ? 'active' : ''}">${s.episodes.map(ep => `<button type="button" data-episode-url="${ep.url}" data-img-src="${data.posterSrc}" class="episode-item ${watchedEpisodes[ep.url] ? 'watched' : ''} text-left p-3 bg-gray-900 hover:bg-gray-700 rounded-md transition border-l-4 border-transparent flex items-center justify-between"><span>${ep.title}</span><div class="spinner hidden ml-2"></div></button>`).join('')}</div>`).join('')}</div>
+                </div>`;
+            }
+            
+            if (data.similarTitles && data.similarTitles.length > 0) {
+                contentHTML += `<div class="mt-8">
+                    <h2 class="text-2xl font-bold text-white mb-4">Títulos Similares</h2>
+                    <div id="similar-titles-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6">
+                    </div>
+                </div>`;
+            }
+            
+            detailContentArea.innerHTML = contentHTML;
 
-               if (data.similarTitles && data.similarTitles.length > 0) {
-                   const similarGrid = document.getElementById('similar-titles-grid');
-                   data.similarTitles.forEach(item => {
-                       const card = renderCard(item, watchedMainUrls.includes(item.url));
-                       similarGrid.appendChild(card);
-                   });
-               }
+            if (data.similarTitles && data.similarTitles.length > 0) {
+                const similarGrid = document.getElementById('similar-titles-grid');
+                data.similarTitles.forEach(item => {
+                    const card = renderCard(item, watchedMainUrls.includes(item.url));
+                    similarGrid.appendChild(card);
+                });
+            }
         };
 
         const loadAndShowDetailView = async (url, pushState = true) => {
@@ -909,26 +910,36 @@
             }
         };
 
-        const openModalWithVideo = (iframeSrc, posterSrc, episodeData = null, pushState = true) => {
+        const openModalWithVideo = (iframeSrc, posterSrc, contentData = null, episodeListPanelData = null, pushState = true) => {
             if(pushState) history.pushState({ view: 'modal' }, '');
             
+            let newTitle = "Viendo Contenido - SCRAPFLIX";
+            if (contentData && contentData.title) {
+                if (contentData.episodeTitle) {
+                    newTitle = `Viendo: ${contentData.title} - ${contentData.episodeTitle}`;
+                } else {
+                    newTitle = `Viendo: ${contentData.title}`;
+                }
+            }
+            document.title = newTitle;
+
             const showExternalBtn = getLocalStorageData(EXTERNAL_PLAYER_KEY, true);
             const showEpisodeList = getLocalStorageData(EPISODE_LIST_IN_PLAYER_KEY, true);
 
             modalOpenExternalBtn.style.display = showExternalBtn ? 'block' : 'none';
             modalView.dataset.videoSrc = iframeSrc;
 
-            if (showEpisodeList && episodeData && episodeData.episodes.length > 0) {
+            if (showEpisodeList && episodeListPanelData && episodeListPanelData.episodes.length > 0) {
                 modalEpisodeListContainer.classList.remove('hidden');
                 modalContent.classList.add('md:flex-row');
                 modalContent.classList.remove('max-w-4xl'); 
                 const watchedEpisodes = getWatchedEpisodes();
-                modalEpisodeList.innerHTML = episodeData.episodes.map(ep => `
+                modalEpisodeList.innerHTML = episodeListPanelData.episodes.map(ep => `
                     <button 
                         type="button" 
                         data-episode-url="${ep.url}" 
                         class="modal-episode-item w-full text-left p-3 bg-gray-800 hover:bg-gray-700 rounded-md transition border-l-4 
-                        ${ep.url === episodeData.currentUrl ? 'active' : 'border-transparent'} 
+                        ${ep.url === episodeListPanelData.currentUrl ? 'active' : 'border-transparent'} 
                         ${watchedEpisodes[ep.url] ? 'watched' : ''}">
                         ${ep.title}
                     </button>
@@ -985,7 +996,7 @@
              throw new Error("No se pudo encontrar el video. El sitio puede haber cambiado su estructura.");
         }
         
-        const fetchAndShowVideo = async (videoPageUrl, clickedElement, episodeData) => {
+        const fetchAndShowVideo = async (videoPageUrl, clickedElement, contentDataForTitle, episodeListPanelData) => {
             if (!clickedElement || clickedElement.classList.contains('loading')) return;
             
             const posterSrc = clickedElement.dataset.imgSrc || modalView.dataset.posterSrc || 'https://placehold.co/1280x720/111827/d1d5db?text=Cargando...';
@@ -996,7 +1007,7 @@
             clickedElement.querySelector('.spinner')?.classList.remove('hidden');
             try {
                 const videoSrc = await fetchVideoSrc(videoPageUrl);
-                openModalWithVideo(videoSrc, posterSrc, episodeData);
+                openModalWithVideo(videoSrc, posterSrc, contentDataForTitle, episodeListPanelData);
             } catch (error) {
                 console.error("Error al cargar el video:", error);
                 alert(`${error.message}\n\nPor favor, intenta de nuevo.`);
@@ -1037,9 +1048,17 @@
 
                 setContinueWatching(continueData);
                 markAsWatched(mainContentData);
-                await fetchAndShowVideo(episodeUrl, clickedButton, episodeData);
+                await fetchAndShowVideo(episodeUrl, clickedButton, continueData, episodeData);
             } else {
-                 await fetchAndShowVideo(episodeUrl, clickedButton, null);
+                let movieData = {
+                    url: clickedButton.dataset.episodeUrl,
+                    title: clickedButton.querySelector('h3')?.textContent.trim() || 'Película',
+                    imgSrc: clickedButton.dataset.imgSrc,
+                    episodeUrl: clickedButton.dataset.episodeUrl
+                }
+                setContinueWatching(movieData);
+                markAsWatched(movieData);
+                await fetchAndShowVideo(episodeUrl, clickedButton, movieData, null);
             }
             clickedButton.classList.add('watched');
             if (clickedButton.id === 'watch-now-btn') clickedButton.querySelector('span').textContent = 'Ver de Nuevo';
@@ -1081,6 +1100,7 @@
                       };
                       setContinueWatching(continueData);
                       markEpisodeAsWatched(newUrl);
+                      document.title = `Viendo: ${continueData.title} - ${continueData.episodeTitle}`;
                 }
             } catch (error) {
                  modalIframeContainer.innerHTML = `<div class="w-full h-full flex items-center justify-center bg-black text-red-500 p-4">Error al cargar el video.</div>`;
@@ -1307,6 +1327,7 @@
             localStorage.setItem(SAVED_URL_KEY, url);
             history.back();
             viewSubtitle.textContent = "Contenido Reciente";
+            document.title = "Contenido Reciente - SCRAPFLIX";
             recentlyAddedBtn.classList.add('active');
             favoritesFilterBtn.classList.remove('active');
             await loadGalleryPage(url);
@@ -1324,6 +1345,7 @@
             
             const searchUrl = `https://serieskao.top/search?s=${encodeURIComponent(query)}`;
             viewSubtitle.textContent = "Resultados de Búsqueda";
+            document.title = `Buscando: "${query}" - SCRAPFLIX`;
             loadGalleryPage(searchUrl);
         });
         
@@ -1336,6 +1358,7 @@
             favoritesFilterBtn.classList.remove('active');
             recentlyAddedBtn.classList.add('active');
             viewSubtitle.textContent = "Contenido Reciente";
+            document.title = 'Contenido Reciente - SCRAPFLIX';
             bannerContainer.classList.remove('hidden');
             const savedUrl = localStorage.getItem(SAVED_URL_KEY);
             if (savedUrl) {
@@ -1444,9 +1467,16 @@
                 loadAndShowDetailView(state.url, false);
             } else if (state.view === 'config') {
                 showView('config-view');
+                document.title = 'Configuración - SCRAPFLIX';
             } else {
-                 showView('main-view');
-                 if(lastMainView === 'favorites') displayFavorites();
+                showView('main-view');
+                if(lastMainView === 'favorites') {
+                    document.title = 'Mis Favoritos - SCRAPFLIX';
+                } else if(lastMainView === 'search') {
+                    document.title = 'Resultados de Búsqueda - SCRAPFLIX';
+                } else {
+                    document.title = 'Contenido Reciente - SCRAPFLIX';
+                }
             }
         });
 
@@ -1467,6 +1497,7 @@
 
             urlInput.value = savedUrl;
             viewSubtitle.textContent = "Contenido Reciente";
+            document.title = 'SCRAPFLIX | Contenido Reciente';
             recentlyAddedBtn.classList.add('active');
             lastMainView = 'recent';
             loadGalleryPage(savedUrl);
