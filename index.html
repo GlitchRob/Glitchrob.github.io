@@ -3,489 +3,1436 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Comparador de Precios por Unidad</title>
+    <title>Reproductor de Contenido</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; }
-        #reader {
-            width: 100%;
-            border-radius: 0.75rem;
-            border: 2px solid #4f46e5;
-            overflow: hidden;
-            position: relative;
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827;
+            color: #d1d5db;
+            overflow-x: hidden;
         }
-        #reader.scanning::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 4px;
-            background: #ef4444;
-            box-shadow: 0 0 10px #ef4444;
-            animation: scanning 2s infinite linear;
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+        
+        .poster-card img {
+            aspect-ratio: 2 / 3;
         }
-        @keyframes scanning {
-            0% { transform: translateY(0); }
-            50% { transform: translateY(calc(100% - 4px)); }
-            100% { transform: translateY(0); }
-        }
-        #reader video { width: 100%; height: auto; display: block; }
+        
         .spinner {
             border: 2px solid rgba(255, 255, 255, 0.3);
-            border-top-color: #fff;
             border-radius: 50%;
+            border-top-color: #fff;
             width: 16px;
             height: 16px;
-            animation: spin 1s linear infinite;
+            animation: spin 1s ease-in-out infinite;
         }
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+
+        .view { display: none; }
+        .view.active { display: block; animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .season-tab.active { background-color: #DC2626; color: white; }
+        .episode-pane { display: none; }
+        .episode-pane.active { display: grid; }
+        
+        .episode-item.loading, .watch-now-btn.loading, #continue-watching-card.loading {
+            cursor: wait;
+            background-color: #374151;
+        }
+
+        /* --- Watched, Favorite & New Styles --- */
+        .poster-card.watched .relative::after {
+            content: '✔';
+            position: absolute;
+            bottom: 8px;
+            left: 8px;
+            background-color: #16a34a;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+        .poster-card.has-new .relative::before {
+            content: 'NUEVO';
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            background-color: #f59e0b;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: bold;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            z-index: 11;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.9; }
+        }
+        .poster-card.has-new.watched .relative::after {
+             display: none; /* "NUEVO" tiene prioridad sobre "visto" */
+        }
+        .episode-item.watched, .modal-episode-item.watched {
+            opacity: 0.6;
+            border-left-color: #16a34a !important;
+        }
+        .episode-item.watched:hover, .modal-episode-item.watched:hover {
+            opacity: 1;
+        }
+        .modal-episode-item.active {
+            background-color: #DC2626 !important;
+            color: white;
+            border-left-color: #f59e0b !important;
+        }
+        .watch-now-btn.watched {
+            background-color: #16a34a;
+        }
+        .watch-now-btn.watched:hover {
+            background-color: #15803d;
+        }
+        .fav-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            z-index: 10;
+            background-color: rgba(0,0,0,0.5);
+            border-radius: 9999px;
+            padding: 4px;
+            transition: all 0.2s ease-in-out;
+        }
+        .fav-btn:hover {
+            background-color: rgba(220, 38, 38, 0.8);
+        }
+        .fav-btn.favorited svg {
+            fill: #DC2626;
+            color: #DC2626;
+        }
+        #favorites-filter-btn.active, #recently-added-btn.active {
+            background-color: #DC2626;
+        }
+        
+        #continue-watching-card .flex-grow {
+            min-width: 0;
+        }
+
+        /* --- Detail Hero Styles --- */
+        .detail-hero {
+            position: relative;
+            background-size: cover;
+            background-position: center center;
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+        .detail-hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(to right, rgba(17, 24, 39, 1) 20%, rgba(17, 24, 39, 0.7) 50%, rgba(17, 24, 39, 0.4) 100%);
+            z-index: 1;
+        }
+         @media (max-width: 768px) {
+            .detail-hero::before {
+                 background: linear-gradient(to top, rgba(17, 24, 39, 1) 20%, rgba(17, 24, 39, 0.7) 60%, rgba(17, 24, 39, 0.4) 100%);
+            }
+        }
+        
+        /* --- Video Placeholder Styles --- */
+        #video-placeholder {
+            background-size: cover;
+            background-position: center;
+            cursor: pointer;
+            transition: filter 0.3s;
+        }
+        #video-placeholder:hover {
+            filter: brightness(1.2);
+        }
+        #video-placeholder .play-icon {
+            transition: transform 0.3s;
+        }
+        #video-placeholder:hover .play-icon {
+            transform: scale(1.1);
+        }
+        
+        /* --- Auto-hide Header --- */
+        #main-view > header.sticky {
+            transition: transform 0.3s ease-in-out;
+            will-change: transform;
+        }
+        #main-view > header.sticky.header-hidden {
+            transform: translateY(-110%);
+        }
+
+        /* Banner Styles */
+        #banner-slider .banner-slide {
+            flex-shrink: 0;
+            width: 100%;
+            aspect-ratio: 16 / 7;
+            background-size: cover;
+            background-position: center;
+        }
+
     </style>
 </head>
-<body class="bg-gray-900 text-white min-h-screen flex items-center justify-center p-4">
-    <div class="w-full max-w-md mx-auto bg-gray-800 rounded-2xl shadow-2xl p-6 space-y-6">
-        <header class="text-center">
-            <h1 class="text-3xl font-bold text-indigo-400">Comparador por Unidad ⚖️</h1>
-            <p id="header-subtitle" class="text-gray-400 mt-2">Apunta la cámara al código de barras.</p>
+<body class="bg-gray-900">
+
+    <!-- Main View: Displays the gallery -->
+    <div id="main-view" class="view active container mx-auto p-4 md:p-8">
+        <header class="sticky top-0 z-30 bg-gray-900 py-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+            <div>
+                <h1 id="main-title" class="text-3xl md:text-5xl font-bold text-white"></h1>
+                <p id="source-url" class="text-sm text-gray-400 mt-1 truncate max-w-xs md:max-w-md" style="display: none;"></p>
+            </div>
+             <div class="flex items-center gap-2 w-full md:w-auto">
+                 <form id="search-form" class="relative w-full md:w-64">
+                      <input type="search" id="search-input" placeholder="Buscar contenido..." class="w-full p-3 pl-10 bg-gray-800 border border-gray-600 rounded-lg text-gray-300 focus:ring-2 focus:ring-red-500 focus:border-red-500 transition">
+                      <svg class="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
+                 </form>
+                 <button id="recently-added-btn" class="p-3 rounded-lg hover:bg-gray-700 transition-colors flex-shrink-0" title="Ver contenido reciente">
+                    <svg class="w-6 h-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.562L16.5 21.75l-.398-1.188a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.188-.398a2.25 2.25 0 001.423-1.423L16.5 15.75l.398 1.188a2.25 2.25 0 001.423 1.423L19.5 18.75l-1.188.398a2.25 2.25 0 00-1.423 1.423z" /></svg>
+                 </button>
+                 <button id="check-updates-btn" class="p-3 rounded-lg hover:bg-gray-700 transition-colors flex-shrink-0" title="Revisar favoritos por nuevos capítulos">
+                    <svg class="w-6 h-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" /></svg>
+                 </button>
+                 <button id="favorites-filter-btn" class="p-3 rounded-lg hover:bg-gray-700 transition-colors flex-shrink-0" title="Ver Favoritos">
+                      <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
+                 </button>
+                 <button id="config-btn" class="p-3 rounded-lg hover:bg-gray-700 transition-colors flex-shrink-0" title="Configuración">
+                      <svg class="w-6 h-6 text-gray-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-1.007 1.11-.1.09.542-.27.828-.473.546l-.42.24c-.11.063-.24.094-.37.094H9.594zM14.857 14.18c-.309.176-.62.323-.94.44l.014.004c.03.01.06.022.09.033-2.28 1.433-4.234 1.433-6.514 0a.48.48 0 01.09-.033l.014-.004a10.93 10.93 0 01-.94-.44c-.31-.176-.62-.323-.94-.44a1.01 1.01 0 01-.527-1.482l.194-.332c.11-.19.26-.35.43-.48l.42-.32c.11-.08.24-.13.38-.13h1.13c.13 0 .26.05.38.13l.42.32c.17.13.32.29.43.48l.194.332a1.01 1.01 0 01-.527 1.482zM4.006 7.412c.09.542.56 1.007 1.11.1.09-.542-.27-.828-.473-.546l-.42.24c-.11.063-.24.094-.37.094H4.006zM19.994 7.412c-.09.542-.56 1.007-1.11.1-.09-.542.27-.828.473-.546l.42.24c.11.063.24.094-.37.094h.001z" /><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9 9 0 100-18 9 9 0 000 18z" /></svg>
+                 </button>
+            </div>
         </header>
-
-        <main id="scanner-section">
-            <div id="reader" class="bg-gray-700"></div>
+        <main>
+            <div id="banner-container" class="mb-10 hidden relative rounded-lg overflow-hidden">
+                <div id="banner-slider" class="flex transition-transform duration-500 ease-in-out">
+                    <!-- Banner slides will be injected here -->
+                </div>
+                <button id="banner-prev" class="absolute top-1/2 left-4 -translate-y-1/2 bg-black/50 text-white p-2 rounded-full hover:bg-black/80 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+                </button>
+                <button id="banner-next" class="absolute top-1/2 right-4 -translate-y-1/2 bg-black/50 text-white p-2 rounded-full hover:bg-black/80 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                </button>
+            </div>
+            <div id="continue-watching-container" class="hidden mb-10"></div>
+            <div id="results-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6"></div>
+            <div id="status-message-area"></div>
+            <div id="pagination-controls" class="flex justify-center items-center flex-wrap gap-2 mt-8"></div>
         </main>
+    </div>
 
-        <section id="result-section" class="hidden space-y-4">
-            <!-- Info del producto -->
-            <div id="product-display" class="hidden text-center p-4 bg-gray-700 rounded-lg relative">
-                <img id="product-image" src="" alt="Imagen del Producto" class="mx-auto my-2 rounded-lg w-28 h-28 object-contain bg-white p-1 shadow-md" onerror="this.src='https://placehold.co/128x128/ffffff/e0e0e0?text=Sin+Imagen'; this.onerror=null;">
-                <button id="edit-image-button" class="absolute top-4 right-4 bg-black/50 p-1.5 rounded-full text-white hover:bg-black/75"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pencil-fill" viewBox="0 0 16 16"><path d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708l-3-3zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207l6.5-6.5zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.5a.499.499 0 0 1-.175-.032l-.179.178a.5.5 0 0 0-.11.168l-2 5a.5.5 0 0 0 .65.65l5-2a.5.5 0 0 0 .168-.11l.178-.178z"/></svg></button>
-                <h3 id="product-name" class="text-xl font-bold text-white"></h3>
-                <p id="product-barcode" class="text-sm font-mono text-gray-400"></p>
-                <p id="product-category" class="text-xs text-purple-400 font-medium mt-1"></p>
-                <p id="category-loader" class="hidden text-xs text-purple-400 animate-pulse">Identificando categoría con IA...</p>
-            </div>
-            
-            <div id="image-edit-options" class="hidden p-4 bg-gray-700/80 rounded-lg space-y-3">
-                 <h3 class="text-md font-semibold text-center text-gray-200">Actualizar Imagen</h3>
-                 <input type="text" id="image-url-input" placeholder="Pegar URL de la imagen" class="block w-full bg-gray-900 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-indigo-500">
-                 <button id="upload-image-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Subir de Galería</button>
-                 <input type="file" id="image-file-input" class="hidden" accept="image/*">
-            </div>
-
-            <!-- Loader y mensajes -->
-            <div id="loading-spinner" class="hidden text-center"><svg class="animate-spin h-8 w-8 text-white mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><p class="text-yellow-400 mt-2">Buscando...</p></div>
-            <div id="not-found" class="hidden p-4 bg-red-900/50 rounded-lg text-center"><p class="text-xl text-red-300">Producto no encontrado. Agrégalo manualmente.</p></div>
-
-            <!-- Comparación de precios (mismo producto) -->
-            <div id="price-comparison-section" class="hidden space-y-3">
-                <h2 class="text-lg font-semibold text-center text-indigo-300">Precios Registrados</h2>
-                <ul id="price-list" class="space-y-2"></ul>
-            </div>
-            
-            <!-- Comparación de productos similares -->
-            <div id="similar-products-section" class="hidden space-y-3">
-                <h2 class="text-lg font-semibold text-center text-green-300">Alternativas Similares</h2>
-                <ul id="similar-products-list" class="space-y-2"></ul>
-            </div>
-
-            <!-- Formulario para agregar/actualizar precios -->
-            <div id="add-price-form" class="hidden p-4 bg-gray-700/50 rounded-lg space-y-4">
-                 <h2 id="form-title" class="text-lg font-semibold text-center text-indigo-300"></h2>
-                <div id="manual-name-container" class="hidden">
-                    <label for="manual-product-name" class="block text-sm font-medium text-gray-300">Nombre del Producto</label>
-                    <div class="flex items-center gap-2 mt-1">
-                        <input type="text" id="manual-product-name" class="block w-full bg-gray-900 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-indigo-500">
-                        <button id="suggest-name-button" class="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-3 rounded-lg shrink-0"><span id="suggest-button-text">✨ Sugerir</span><div id="suggest-spinner" class="spinner hidden"></div></button>
+    <!-- Config View -->
+    <div id="config-view" class="view">
+        <div class="flex flex-col items-center justify-center min-h-screen p-4">
+            <div class="w-full max-w-lg">
+                <header class="text-center mb-8"><h1 class="text-3xl md:text-5xl font-bold text-white mb-2">Configuración</h1><p class="text-md text-gray-400">Introduce la URL para extraer su contenido.</p></header>
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700">
+                    <label for="urlInput" class="block mb-2 text-sm font-medium text-gray-300">URL Base del Sitio:</label>
+                    <input type="url" id="urlInput" class="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg text-gray-300 focus:ring-2 focus:ring-red-500 focus:border-red-500 transition" placeholder="https://serieskao.top/year/2025/">
+                    <button id="saveBtn" class="mt-4 flex justify-center items-center gap-2 w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg transition transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-red-500 disabled:bg-red-800 disabled:cursor-not-allowed disabled:scale-100"><div class="spinner hidden"></div><span id="button-text">Guardar y Cargar</span></button>
+                    <button id="clear-cache-btn" class="mt-2 flex justify-center items-center gap-2 w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 px-6 rounded-lg transition">Limpiar Caché</button>
+                    
+                    <div class="mt-4 pt-4 border-t border-gray-700 space-y-4">
+                         <label for="hide-redirect-alert-checkbox" class="flex items-center cursor-pointer">
+                            <input type="checkbox" id="hide-redirect-alert-checkbox" class="h-4 w-4 rounded border-gray-500 bg-gray-700 text-red-600 focus:ring-red-500">
+                            <span class="ml-3 text-sm text-gray-300">No volver a mostrar alerta de navegación</span>
+                         </label>
+                         <label for="adblock-checkbox" class="flex items-center cursor-pointer">
+                            <input type="checkbox" id="adblock-checkbox" class="h-4 w-4 rounded border-gray-500 bg-gray-700 text-red-600 focus:ring-red-500">
+                            <span class="ml-3 text-sm text-gray-300">Bloqueador de Publicidad (Experimental)</span>
+                         </label>
+                         <p class="text-xs text-gray-500 -mt-2 ml-7">Restringe pop-ups y redirecciones. Puede interferir con algunos reproductores.</p>
+                          <label for="external-player-checkbox" class="flex items-center cursor-pointer">
+                            <input type="checkbox" id="external-player-checkbox" class="h-4 w-4 rounded border-gray-500 bg-gray-700 text-red-600 focus:ring-red-500">
+                            <span class="ml-3 text-sm text-gray-300">Mostrar botón para reproductor externo</span>
+                         </label>
+                         <label for="episode-list-player-checkbox" class="flex items-center cursor-pointer">
+                            <input type="checkbox" id="episode-list-player-checkbox" class="h-4 w-4 rounded border-gray-500 bg-gray-700 text-red-600 focus:ring-red-500">
+                            <span class="ml-3 text-sm text-gray-300">Mostrar lista de episodios en el reproductor</span>
+                         </label>
                     </div>
+                    
+                    <button id="back-to-main-btn" class="mt-4 text-center w-full text-gray-400 hover:text-white py-2 rounded-lg transition">Volver a la Galería</button>
                 </div>
-                <div>
-                    <label for="price-input" class="block text-sm font-medium text-gray-300">Precio (MXN)</label>
-                    <input type="number" id="price-input" step="0.01" placeholder="Ej: 35.50" class="mt-1 block w-full bg-gray-900 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-indigo-500">
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label for="quantity-input" class="block text-sm font-medium text-gray-300">Cantidad</label>
-                        <input type="number" id="quantity-input" step="0.01" placeholder="Ej: 250" class="mt-1 block w-full bg-gray-900 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-indigo-500">
-                    </div>
-                    <div>
-                        <label for="unit-select" class="block text-sm font-medium text-gray-300">Unidad</label>
-                        <select id="unit-select" class="mt-1 block w-full bg-gray-900 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-indigo-500">
-                            <option value="g">gramos (g)</option>
-                            <option value="kg">kilos (kg)</option>
-                            <option value="ml">mililitros (ml)</option>
-                            <option value="L">litros (L)</option>
-                            <option value="pz">piezas (pz)</option>
-                            <option value="hojas">hojas</option>
-                            <option value="paquete">paquete</option>
-                        </select>
-                    </div>
-                </div>
-                <div>
-                    <label for="store-select" class="block text-sm font-medium text-gray-300">Tienda</label>
-                    <select id="store-select" class="mt-1 block w-full bg-gray-900 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-indigo-500"></select>
-                </div>
-                <button id="save-price-button" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">Guardar Registro</button>
             </div>
-
-            <!-- Gestionar Tiendas -->
-            <div id="add-store-section" class="p-4 bg-gray-700/50 rounded-lg space-y-3">
-                 <h2 class="text-lg font-semibold text-center text-gray-300">Gestionar Tiendas</h2>
-                 <div class="flex gap-2">
-                    <input type="text" id="new-store-input" placeholder="Nombre de la nueva tienda" class="block w-full bg-gray-900 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-indigo-500">
-                    <button id="add-store-button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shrink-0">+</button>
-                 </div>
-            </div>
-        </section>
-
-        <footer class="flex justify-center">
-            <button id="rescan-button" class="hidden bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg">Escanear Otro</button>
-        </footer>
+        </div>
     </div>
     
-    <div id="toast" class="fixed bottom-8 left-1/2 -translate-x-1/2 bg-green-600 text-white py-2 px-5 rounded-full text-sm shadow-lg opacity-0 transition-opacity duration-300 pointer-events-none"></div>
+    <!-- Detail View -->
+    <div id="detail-view" class="view container mx-auto p-4 md:p-8">
+        <header class="sticky top-0 z-40 bg-gray-900 py-3 -mx-4 md:-mx-8 px-4 md:px-8 mb-4">
+            <button id="detail-back-btn" class="flex items-center gap-2 text-gray-300 hover:text-white transition-colors">
+                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                Volver
+            </button>
+        </header>
+        <div id="detail-content-area"></div>
+    </div>
+
+    <!-- Video Player Modal View -->
+    <div id="modal-view" class="fixed inset-0 bg-black bg-opacity-80 z-50 hidden items-center justify-center p-4 transition-opacity duration-300">
+        <div id="modal-content" class="bg-gray-900 border border-gray-700 rounded-lg shadow-xl w-full max-w-6xl h-full max-h-[90vh] relative flex flex-col md:flex-row">
+             <div class="flex-grow flex flex-col bg-black rounded-l-lg relative">
+                <header class="flex justify-end items-center p-2 absolute top-0 right-0 z-20">
+                    <button id="modal-open-external-btn" class="p-2 text-white hover:bg-white/20 rounded-full transition" title="Abrir en pestaña nueva">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                    </button>
+                    <button id="modal-fullscreen-btn" class="p-2 text-white hover:bg-white/20 rounded-full transition" title="Pantalla Completa">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 1v4m0 0h-4m4 0l-5-5"></path></svg>
+                    </button>
+                    <button id="modal-close-btn" class="p-2 text-white hover:bg-white/20 rounded-full transition" title="Cerrar">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </header>
+                <div id="modal-iframe-container" class="w-full h-full flex-grow rounded-lg overflow-hidden"></div>
+            </div>
+            <div id="modal-episode-list-container" class="w-full md:w-80 flex-shrink-0 bg-gray-900 md:rounded-r-lg flex flex-col hidden">
+                <h3 class="p-4 text-lg font-bold border-b border-gray-700">Episodios</h3>
+                <div id="modal-episode-list" class="overflow-y-auto p-2 space-y-1">
+                    <!-- Episodes will be injected here -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- History Modal View -->
+    <div id="history-modal-view" class="fixed inset-0 bg-black bg-opacity-80 z-[60] hidden items-center justify-center p-4 transition-opacity duration-300">
+        <div class="bg-gray-900 border border-gray-700 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] relative flex flex-col">
+            <header class="flex justify-between items-center p-4 border-b border-gray-700">
+                <h2 class="text-xl font-bold text-white">Historial de Vistos</h2>
+                <button id="history-modal-close-btn" class="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition" title="Cerrar">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </header>
+            <div id="history-modal-grid" class="p-4 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                <!-- History items will be injected here -->
+            </div>
+        </div>
+    </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            let stores = [], products = {}, currentBarcode = null, currentProductInfo = null, html5QrCode, isScanning = false;
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- DOM Elements ---
+        const mainView = document.getElementById('main-view'), configView = document.getElementById('config-view'), detailView = document.getElementById('detail-view');
+        const header = document.querySelector('#main-view header');
+        const bannerContainer = document.getElementById('banner-container');
+        const bannerSlider = document.getElementById('banner-slider');
+        const bannerPrevBtn = document.getElementById('banner-prev');
+        const bannerNextBtn = document.getElementById('banner-next');
+        const modalView = document.getElementById('modal-view'), modalIframeContainer = document.getElementById('modal-iframe-container');
+        const modalContent = document.getElementById('modal-content');
+        const modalEpisodeListContainer = document.getElementById('modal-episode-list-container');
+        const modalEpisodeList = document.getElementById('modal-episode-list');
+        const modalCloseBtn = document.getElementById('modal-close-btn'), modalFullscreenBtn = document.getElementById('modal-fullscreen-btn');
+        const modalOpenExternalBtn = document.getElementById('modal-open-external-btn');
+        const urlInput = document.getElementById('urlInput'), saveBtn = document.getElementById('saveBtn'), configBtn = document.getElementById('config-btn');
+        const backToMainBtn = document.getElementById('back-to-main-btn'), detailBackBtn = document.getElementById('detail-back-btn');
+        const resultsGrid = document.getElementById('results-grid'), statusArea = document.getElementById('status-message-area');
+        const sourceUrlDisplay = document.getElementById('source-url');
+        const detailContentArea = document.getElementById('detail-content-area');
+        const searchForm = document.getElementById('search-form'), searchInput = document.getElementById('search-input');
+        const paginationControls = document.getElementById('pagination-controls');
+        const favoritesFilterBtn = document.getElementById('favorites-filter-btn'), mainTitle = document.getElementById('main-title');
+        const continueWatchingContainer = document.getElementById('continue-watching-container');
+        const clearCacheBtn = document.getElementById('clear-cache-btn');
+        const historyModalView = document.getElementById('history-modal-view');
+        const historyModalCloseBtn = document.getElementById('history-modal-close-btn');
+        const historyModalGrid = document.getElementById('history-modal-grid');
+        const hideRedirectAlertCheckbox = document.getElementById('hide-redirect-alert-checkbox');
+        const adblockCheckbox = document.getElementById('adblock-checkbox');
+        const externalPlayerCheckbox = document.getElementById('external-player-checkbox');
+        const episodeListPlayerCheckbox = document.getElementById('episode-list-player-checkbox');
+        const checkUpdatesBtn = document.getElementById('check-updates-btn');
+        const recentlyAddedBtn = document.getElementById('recently-added-btn');
+        
+        // --- State Keys & Config ---
+        const SAVED_URL_KEY = 'contentExtractorSavedUrl';
+        const WATCHED_HISTORY_KEY = 'contentExtractorWatchedHistory';
+        const WATCHED_EPISODES_KEY = 'contentExtractorWatchedEpisodes';
+        const FAVORITES_KEY = 'contentExtractorFavorites';
+        const CONTINUE_WATCHING_KEY = 'contentExtractorContinueWatching';
+        const CACHE_KEY_PREFIX = 'contentExtractorCache_';
+        const HIDE_REDIRECT_ALERT_KEY = 'contentExtractorHideRedirectAlert';
+        const AD_BLOCK_KEY = 'contentExtractorAdBlockEnabled';
+        const EXTERNAL_PLAYER_KEY = 'contentExtractorExternalPlayerEnabled';
+        const EPISODE_LIST_IN_PLAYER_KEY = 'contentExtractorEpisodeListInPlayer';
+        const CACHE_EXPIRATION_MS = 60 * 60 * 1000; // 1 hour expiration
+        
+        let lastMainView = 'recent'; // 'recent', 'favorites', or 'search'
+        let lastLoadedUrl = '';
+        let lastScrollTop = 0;
+        let bannerCurrentIndex = 0;
+        let bannerTotalSlides = 0;
+        let bannerInterval;
+        const checkUpdatesBtnIcon = checkUpdatesBtn.innerHTML;
 
-            const dom = {
-                scannerSection: document.getElementById('scanner-section'),
-                reader: document.getElementById('reader'),
-                resultSection: document.getElementById('result-section'),
-                productDisplay: document.getElementById('product-display'),
-                productImage: document.getElementById('product-image'),
-                productName: document.getElementById('product-name'),
-                productBarcode: document.getElementById('product-barcode'),
-                productCategory: document.getElementById('product-category'),
-                categoryLoader: document.getElementById('category-loader'),
-                editImageButton: document.getElementById('edit-image-button'),
-                imageEditOptions: document.getElementById('image-edit-options'),
-                imageUrlInput: document.getElementById('image-url-input'),
-                uploadImageButton: document.getElementById('upload-image-button'),
-                imageFileInput: document.getElementById('image-file-input'),
-                loadingSpinner: document.getElementById('loading-spinner'),
-                notFound: document.getElementById('not-found'),
-                priceComparisonSection: document.getElementById('price-comparison-section'),
-                priceList: document.getElementById('price-list'),
-                similarProductsSection: document.getElementById('similar-products-section'),
-                similarProductsList: document.getElementById('similar-products-list'),
-                addPriceForm: document.getElementById('add-price-form'),
-                formTitle: document.getElementById('form-title'),
-                manualNameContainer: document.getElementById('manual-name-container'),
-                manualProductName: document.getElementById('manual-product-name'),
-                suggestNameButton: document.getElementById('suggest-name-button'),
-                suggestSpinner: document.getElementById('suggest-spinner'),
-                priceInput: document.getElementById('price-input'),
-                quantityInput: document.getElementById('quantity-input'),
-                unitSelect: document.getElementById('unit-select'),
-                storeSelect: document.getElementById('store-select'),
-                savePriceButton: document.getElementById('save-price-button'),
-                newStoreInput: document.getElementById('new-store-input'),
-                addStoreButton: document.getElementById('add-store-button'),
-                rescanButton: document.getElementById('rescan-button'),
-                headerSubtitle: document.getElementById('header-subtitle'),
-                toast: document.getElementById('toast'),
-            };
-            
-            let toastTimeout;
-            const showToast = (message) => {
-                clearTimeout(toastTimeout);
-                dom.toast.textContent = message;
-                dom.toast.classList.remove('opacity-0');
-                toastTimeout = setTimeout(() => dom.toast.classList.add('opacity-0'), 2500);
+
+        // --- Data Helpers ---
+        const getLocalStorageData = (key, defaultValue = {}) => {
+            try {
+                const data = localStorage.getItem(key);
+                return data ? JSON.parse(data) : defaultValue;
+            } catch (e) {
+                console.error(`Could not parse data for key ${key}`, e);
+                return defaultValue;
+            }
+        };
+        const setLocalStorageData = (key, data) => localStorage.setItem(key, JSON.stringify(data));
+        
+        const getWatchedHistory = () => getLocalStorageData(WATCHED_HISTORY_KEY, []);
+        const getFavorites = () => getLocalStorageData(FAVORITES_KEY);
+        const getContinueWatching = () => getLocalStorageData(CONTINUE_WATCHING_KEY);
+        const getWatchedEpisodes = () => getLocalStorageData(WATCHED_EPISODES_KEY, {});
+
+        const markAsWatched = (itemData) => {
+            let history = getWatchedHistory();
+            history = history.filter(h => h.url !== itemData.url);
+            history.unshift({ ...itemData, watchedAt: Date.now() });
+            if (history.length > 50) history = history.slice(0, 50);
+            setLocalStorageData(WATCHED_HISTORY_KEY, history);
+        };
+        
+        const markEpisodeAsWatched = (episodeUrl) => {
+            const watched = getWatchedEpisodes();
+            watched[episodeUrl] = true;
+            setLocalStorageData(WATCHED_EPISODES_KEY, watched);
+        };
+
+        const toggleFavorite = (url, title, imgSrc) => {
+            const favorites = getFavorites();
+            if (favorites[url]) {
+                 delete favorites[url];
+            } else {
+                favorites[url] = { title, imgSrc };
+            }
+            setLocalStorageData(FAVORITES_KEY, favorites);
+            return !!favorites[url];
+        };
+        
+        const setContinueWatching = (data) => setLocalStorageData(CONTINUE_WATCHING_KEY, data);
+        
+        // --- Cache Management ---
+        const getCache = (url) => {
+            const cachedItem = getLocalStorageData(CACHE_KEY_PREFIX + url, null);
+            if (!cachedItem || !cachedItem.timestamp) return null;
+            if ((Date.now() - cachedItem.timestamp) > CACHE_EXPIRATION_MS) {
+                localStorage.removeItem(CACHE_KEY_PREFIX + url);
+                return null;
+            }
+            return cachedItem.data;
+        };
+        const setCache = (url, data) => setLocalStorageData(CACHE_KEY_PREFIX + url, { timestamp: Date.now(), data: data });
+        const clearAllCache = () => {
+            Object.keys(localStorage).forEach(key => { if (key.startsWith(CACHE_KEY_PREFIX)) localStorage.removeItem(key); });
+            alert('Caché limpiada exitosamente.');
+        };
+        
+        // --- Gemini API Call ---
+        const callGeminiAPI = async (prompt, maxRetries = 3) => {
+            const apiKey = ""; // Canvas will provide this
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }],
             };
 
-            const saveData = () => {
+            let attempt = 0;
+            while (attempt < maxRetries) {
                 try {
-                    localStorage.setItem('scanner_stores', JSON.stringify(stores));
-                    localStorage.setItem('scanner_products', JSON.stringify(products));
-                    showToast('¡Cambios guardados!');
-                } catch (e) { console.error("Error saving data", e); }
-            };
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
 
-            const loadData = () => {
-                try {
-                    stores = JSON.parse(localStorage.getItem('scanner_stores')) || [];
-                    products = JSON.parse(localStorage.getItem('scanner_products')) || {};
-                } catch (e) { console.error("Error loading data", e); }
-            };
+                    if (!response.ok) {
+                        const errorBody = await response.json();
+                        console.error('Gemini API Error:', errorBody);
+                        throw new Error(`API responded with status: ${response.status}`);
+                    }
 
-            const updateStoreSelect = () => {
-                dom.storeSelect.innerHTML = '<option value="">Selecciona una tienda</option>';
-                stores.forEach(store => dom.storeSelect.add(new Option(store, store)));
-            };
+                    const result = await response.json();
+                    const candidate = result.candidates?.[0];
 
-            // --- UNIT PRICE CALCULATION LOGIC ---
-            const getNormalizedPrice = (entry) => {
-                if (!entry || !entry.price || !entry.quantity || !entry.unit) return null;
-                const { price, quantity, unit } = entry;
-                let baseQuantity = quantity;
-                let baseUnit = unit;
-
-                if (unit === 'kg') { baseQuantity *= 1000; baseUnit = 'g'; }
-                else if (unit === 'L') { baseQuantity *= 1000; baseUnit = 'ml'; }
-                
-                if (baseQuantity === 0) return null;
-                return { value: price / baseQuantity, unit: baseUnit, original: entry };
-            };
-            
-            const formatNormalizedPrice = (normPrice) => {
-                if (!normPrice) return 'N/A';
-                const value = normPrice.value < 0.10 ? normPrice.value.toFixed(4) : normPrice.value.toFixed(2);
-                return `MXN ${value} / ${normPrice.unit}`;
-            };
-
-            // --- UI RENDERING ---
-            const renderPriceComparison = (barcode) => {
-                const product = products[barcode];
-                const entries = product?.entries || [];
-                if (entries.length === 0) {
-                    dom.priceComparisonSection.classList.add('hidden');
-                    return;
-                }
-                dom.priceList.innerHTML = '';
-                const sortedEntries = entries.map(getNormalizedPrice).filter(Boolean).sort((a, b) => a.value - b.value);
-
-                sortedEntries.forEach((normPrice, index) => {
-                    const entry = normPrice.original;
-                    const isCheapest = index === 0;
-                    const li = document.createElement('li');
-                    li.className = `p-3 rounded-lg ${isCheapest ? 'bg-green-500/20 border border-green-500' : 'bg-gray-700'}`;
-                    li.innerHTML = `
-                        <div class="flex justify-between items-center">
-                            <span class="font-medium ${isCheapest ? 'text-green-300' : ''}">${entry.store}</span>
-                            <span class="font-bold text-lg ${isCheapest ? 'text-green-300' : ''}">MXN ${Number(entry.price).toFixed(2)}</span>
-                        </div>
-                        <div class="flex justify-between items-baseline text-sm mt-1">
-                             <span class="text-gray-400">${entry.quantity} ${entry.unit}</span>
-                             <span class="font-semibold ${isCheapest ? 'text-green-400' : 'text-gray-300'}">${formatNormalizedPrice(normPrice)}</span>
-                        </div>
-                    `;
-                    dom.priceList.appendChild(li);
-                });
-                dom.priceComparisonSection.classList.remove('hidden');
-            };
-
-            const renderSimilarProducts = (category, currentBarcode) => {
-                if (!category) {
-                    dom.similarProductsSection.classList.add('hidden');
-                    return;
-                }
-                const similar = Object.entries(products)
-                    .filter(([barcode, product]) => product.category === category && barcode !== currentBarcode && product.entries?.length > 0);
-                
-                if (similar.length === 0) {
-                    dom.similarProductsSection.classList.add('hidden');
-                    return;
-                }
-
-                dom.similarProductsList.innerHTML = '';
-                similar.forEach(([barcode, product]) => {
-                    const bestPrice = product.entries.map(getNormalizedPrice).filter(Boolean).sort((a, b) => a.value - b.value)[0];
-                    const li = document.createElement('li');
-                    li.className = 'flex items-center gap-4 p-2 bg-gray-700 rounded-lg';
-                    li.innerHTML = `
-                        <img src="${product.imageUrl || 'https://placehold.co/64x64/ffffff/e0e0e0?text=?'}" class="w-16 h-16 object-contain rounded-md bg-white p-1">
-                        <div class="flex-1">
-                            <p class="font-semibold text-white">${product.name}</p>
-                            <p class="text-xs text-gray-400">Mejor Precio por Unidad</p>
-                        </div>
-                        <p class="text-lg font-bold text-green-300 text-right">${formatNormalizedPrice(bestPrice)}</p>
-                    `;
-                    dom.similarProductsList.appendChild(li);
-                });
-                dom.similarProductsSection.classList.remove('hidden');
-            };
-
-            const resetResultView = () => {
-                ['productDisplay','loadingSpinner','notFound','priceComparisonSection','similarProductsSection','addPriceForm','manualNameContainer','imageEditOptions','categoryLoader'].forEach(id=>dom[id].classList.add('hidden'));
-                ['manualProductName','priceInput','quantityInput','storeSelect','imageUrlInput','imageFileInput','productCategory'].forEach(id=>dom[id].value='');
-                dom.productCategory.textContent = '';
-            };
-            
-            const showView = (view) => {
-                dom.scannerSection.classList.toggle('hidden', view !== 'scanner');
-                dom.resultSection.classList.toggle('hidden', view !== 'results');
-                dom.rescanButton.classList.toggle('hidden', view === 'scanner');
-                dom.headerSubtitle.textContent = view === 'scanner' ? "Apunta la cámara al código de barras." : `Código: ${currentBarcode}`;
-            };
-            
-            // --- IMAGE HANDLING ---
-            const updateProductImage = (barcode, imageUrl) => {
-                if (products[barcode]) {
-                    products[barcode].imageUrl = imageUrl;
-                } else if (currentProductInfo) {
-                    currentProductInfo.imageUrl = imageUrl;
-                }
-                dom.productImage.src = imageUrl;
-                saveData();
-            };
-            const handleImageFileUpload = (event) => {
-                const file = event.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = (e) => updateProductImage(currentBarcode, e.target.result);
-                    reader.readAsDataURL(file);
-                }
-            };
-
-            // --- API & AI LOGIC ---
-            const fetchProductInfo = async (barcode) => {
-                dom.loadingSpinner.classList.remove('hidden');
-                try {
-                    const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
-                    if (!response.ok) return null;
-                    const data = await response.json();
-                    return (data.status === 1 && data.product?.product_name) ? { name: data.product.product_name, imageUrl: data.product.image_url || null } : null;
-                } catch (error) { console.error("API Error:", error); return null; } finally { dom.loadingSpinner.classList.add('hidden'); }
-            };
-
-            const callGemini = async (systemPrompt, userQuery) => {
-                const apiKey = ""; // Canvas provides this
-                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-                const payload = { systemInstruction: { parts: [{ text: systemPrompt }] }, contents: [{ parts: [{ text: userQuery }] }] };
-                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                if (!response.ok) throw new Error(`Gemini API request failed`);
-                const result = await response.json();
-                return result.candidates?.[0]?.content?.parts?.[0]?.text;
-            };
-
-            const suggestNameWithAI = async (barcode) => {
-                dom.suggestNameButton.disabled = true; dom.suggestSpinner.classList.remove('hidden');
-                try {
-                    const prompt = "Actúa como experto en catalogación de productos en México. Sugiere un nombre corto y descriptivo para un producto, basándote en su código de barras. Proporciona solo el nombre del producto, sin explicaciones.";
-                    const name = await callGemini(prompt, `El código de barras es: ${barcode}. Sugiere un nombre.`);
-                    dom.manualProductName.value = name ? name.trim() : "No se pudo sugerir.";
-                } catch (error) { console.error("Gemini Name Suggestion Error:", error); } finally { dom.suggestNameButton.disabled = false; dom.suggestSpinner.classList.add('hidden'); }
-            };
-
-            const getCategoryWithAI = async (productName) => {
-                dom.categoryLoader.classList.remove('hidden');
-                try {
-                    const prompt = "Eres un experto en clasificación de productos. Dada una descripción, proporciona una categoría corta y precisa en español (máx 3 palabras). Ejemplos: 'Refresco de Cola', 'Café Soluble', 'Botana Salada'. Responde únicamente con la categoría.";
-                    const category = await callGemini(prompt, `Producto: "${productName}"`);
-                    return category ? category.trim() : null;
-                } catch (error) { console.error("Gemini Category Error:", error); return null; } finally { dom.categoryLoader.classList.add('hidden'); }
-            };
-
-            // --- CORE APP FLOW ---
-            const handleScannedBarcode = async (barcode) => {
-                currentBarcode = barcode; stopScanning(); resetResultView(); showView('results');
-                
-                let product = products[barcode];
-                if (product) {
-                    currentProductInfo = { ...product };
-                    dom.productName.textContent = product.name;
-                    dom.productImage.src = product.imageUrl || 'https://placehold.co/128x128/ffffff/e0e0e0?text=Sin+Imagen';
-                    dom.productCategory.textContent = product.category || '';
-                    renderPriceComparison(barcode);
-                    renderSimilarProducts(product.category, barcode);
-                } else {
-                    currentProductInfo = await fetchProductInfo(barcode) || { name: '', imageUrl: null };
-                    if (currentProductInfo.name) {
-                        dom.productName.textContent = currentProductInfo.name;
-                        dom.productImage.src = currentProductInfo.imageUrl || 'https://placehold.co/128x128/ffffff/e0e0e0?text=Sin+Imagen';
-                        currentProductInfo.category = await getCategoryWithAI(currentProductInfo.name);
-                        if (currentProductInfo.category) {
-                            dom.productCategory.textContent = currentProductInfo.category;
-                            renderSimilarProducts(currentProductInfo.category, barcode);
-                        }
+                    if (candidate && candidate.content?.parts?.[0]?.text) {
+                        return candidate.content.parts[0].text;
                     } else {
-                        dom.productName.textContent = "Producto Desconocido";
-                        dom.productImage.src = 'https://placehold.co/128x128/ffffff/e0e0e0?text=Añadir+Foto';
-                        dom.notFound.classList.remove('hidden');
-                        dom.manualNameContainer.classList.remove('hidden');
+                        throw new Error('Respuesta inválida de la API de Gemini.');
                     }
+                } catch (error) {
+                    attempt++;
+                    if (attempt >= maxRetries) {
+                        throw error;
+                    }
+                    console.log(`Attempt ${attempt} failed. Retrying in ${Math.pow(2, attempt)}s...`);
+                    await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
                 }
-                dom.productBarcode.textContent = barcode;
-                dom.productDisplay.classList.remove('hidden');
-                dom.formTitle.textContent = "Agregar Nuevo Registro de Precio";
-                dom.addPriceForm.classList.remove('hidden');
-            };
+            }
+        };
 
-            const addStore = () => {
-                const newStoreName = dom.newStoreInput.value.trim();
-                if (newStoreName && !stores.includes(newStoreName)) {
-                    stores.push(newStoreName);
-                    updateStoreSelect();
-                    dom.newStoreInput.value = '';
-                    saveData();
+        // --- Navigation Blocker ---
+        const handlePotentialRedirect = (e) => {
+            const shouldHideAlert = getLocalStorageData(HIDE_REDIRECT_ALERT_KEY, false);
+            e.preventDefault();
+            if (shouldHideAlert) {
+                delete e['returnValue'];
+            } else {
+                e.returnValue = '';
+                return 'El video está intentando redirigirte. ¿Bloquear la redirección?';
+            }
+        };
+
+        // --- Core UI & Fetch Functions ---
+        const showView = (viewId) => {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+            window.scrollTo(0, 0);
+        };
+        
+        const showStatusMessage = (area, icon, title, text, retryAction = null) => {
+            const container = area === 'main' ? statusArea : detailContentArea;
+            if (area === 'main') {
+                resultsGrid.innerHTML = '';
+                paginationControls.innerHTML = '';
+            }
+
+            const retryButtonHTML = retryAction
+                ? `<button id="status-retry-btn" class="mt-6 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-5 rounded-lg transition-transform transform hover:scale-105">Reintentar</button>`
+                : '';
+
+            container.innerHTML = `
+                <div class="text-center py-16 px-6 bg-gray-800 rounded-lg border-2 border-dashed border-gray-700">
+                    ${icon}
+                    <h3 class="mt-2 text-lg font-semibold text-white">${title}</h3>
+                    <p class="mt-1 text-sm text-gray-400">${text}</p>
+                    ${retryButtonHTML}
+                </div>`;
+
+            if (retryAction) {
+                const retryBtn = document.getElementById('status-retry-btn');
+                if (retryBtn) {
+                    retryBtn.addEventListener('click', retryAction);
                 }
-            };
+            }
 
-            const savePrice = async () => {
-                const price = parseFloat(dom.priceInput.value);
-                const quantity = parseFloat(dom.quantityInput.value);
-                const unit = dom.unitSelect.value;
-                const store = dom.storeSelect.value;
+            if (area === 'main') container.style.display = 'block';
+        };
 
-                if (![price, quantity, unit, store].every(Boolean) || price <= 0 || quantity <= 0) {
-                    alert("Completa todos los campos con valores válidos.");
-                    return;
+        const fetchHtml = async (url) => {
+            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+            const response = await fetch(proxyUrl);
+            if (!response.ok) throw new Error(`Error en la red: ${response.statusText}`);
+            const data = await response.json();
+            if (!data.contents) throw new Error('Contenido no encontrado. La URL puede ser incorrecta o el sitio estar protegido.');
+            return data.contents;
+        };
+
+        const renderCard = (itemData, isWatched = false) => {
+             const { url, title, imgSrc, seasonName } = itemData;
+               const favorites = getFavorites();
+               const isFavorited = !!favorites[url];
+               const hasNew = favorites[url]?.hasNewEpisodes || false;
+               const card = document.createElement('div');
+               card.className = `poster-card group cursor-pointer bg-gray-800 rounded-lg overflow-hidden transform transition-transform duration-300 hover:scale-105 hover:z-10 shadow-lg border border-gray-700 ${isWatched ? 'watched' : ''} ${hasNew ? 'has-new' : ''}`;
+               card.setAttribute('data-url', url); card.setAttribute('data-title', title); card.setAttribute('data-img', imgSrc);
+               
+               const episodeListButton = seasonName 
+                 ? `<button data-series-url="${url}" class="view-episodes-btn mt-1 text-xs bg-gray-700 hover:bg-red-600 text-white font-semibold py-1 px-2 rounded-full transition-colors w-full">Ver Capítulos</button>` 
+                 : '';
+
+               card.innerHTML = `<div class="relative">
+                      <img src="${imgSrc}" alt="${title}" class="w-full object-cover" loading="lazy" onerror="this.onerror=null;this.src='https://placehold.co/400x600/111827/d1d5db?text=Error';">
+                      <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
+                      <button class="fav-btn ${isFavorited ? 'favorited' : ''}" title="Añadir a favoritos"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg></button>
+                      <div class="absolute bottom-0 left-0 p-3 w-full">
+                         <h3 class="text-white text-sm font-semibold truncate group-hover:whitespace-normal">${title}</h3>
+                         ${episodeListButton}
+                      </div>
+               </div>`;
+               return card;
+        };
+
+        const parseAndDisplayItems = (items) => {
+            resultsGrid.innerHTML = ''; statusArea.style.display = 'none';
+            const watchedUrls = getWatchedHistory().map(h => h.url);
+
+            if (items.length === 0) {
+                showStatusMessage('main', `<svg class="mx-auto h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>`, 'No se encontraron resultados', 'Intenta con otra búsqueda o verifica la URL.');
+                return;
+            }
+            items.forEach(item => {
+                const card = renderCard(item, watchedUrls.includes(item.url));
+                resultsGrid.appendChild(card);
+            });
+        };
+        
+        const displayFavorites = () => {
+            lastMainView = 'favorites';
+            mainTitle.textContent = "Mis Favoritos";
+            favoritesFilterBtn.classList.add('active');
+            recentlyAddedBtn.classList.remove('active');
+            paginationControls.style.display = 'none';
+            bannerContainer.classList.add('hidden');
+
+            const watchedUrls = getWatchedHistory().map(h => h.url);
+            const favoriteItems = Object.entries(getFavorites());
+            resultsGrid.innerHTML = ''; statusArea.style.display = 'none';
+            if (favoriteItems.length === 0) {
+                showStatusMessage('main', `<svg class="mx-auto h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>`, 'No tienes favoritos', 'Haz clic en el corazón de cualquier película o serie para añadirla aquí.');
+                return;
+            }
+            favoriteItems.forEach(([url, data]) => {
+                const card = renderCard({ url, ...data }, watchedUrls.includes(url));
+                resultsGrid.appendChild(card);
+            });
+        };
+
+        const renderContinueWatching = () => {
+            const item = getContinueWatching();
+            if (!item || !item.url) {
+                continueWatchingContainer.classList.add('hidden');
+                return;
+            }
+            
+            let subtitle = `<span class="text-red-400">Haz clic para continuar</span>`;
+            if (item.seasonName && item.episodeTitle) {
+                subtitle = `Continuar: <span class="font-semibold text-red-400">${item.seasonName} - ${item.episodeTitle}</span>`;
+            } else if (item.episodeTitle) {
+                subtitle = `Continuar: <span class="font-semibold text-red-400">${item.episodeTitle}</span>`;
+            }
+
+            const historyButton = getWatchedHistory().length > 1 ? `<button id="view-history-btn" class="text-sm bg-gray-700 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">Ver Historial</button>` : '';
+            const episodeListButton = item.seasonName ? `<button data-series-url="${item.url}" class="view-episodes-btn mt-2 text-xs bg-gray-700 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-full transition-colors">Ver Capítulos</button>` : '';
+            
+            continueWatchingContainer.innerHTML = `
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold text-white">Seguir Viendo</h2>
+                    ${historyButton}
+                </div>
+                <div id="continue-watching-card" data-episode-url="${item.episodeUrl || item.url}" data-img-src="${item.imgSrc}" class="bg-gray-800 rounded-lg flex items-center gap-4 p-4 border border-gray-700 cursor-pointer hover:bg-gray-700 transition relative">
+                    <img src="${item.imgSrc}" alt="${item.title}" class="w-16 h-24 object-cover rounded-md flex-shrink-0">
+                    <div class="flex-grow min-w-0">
+                        <h3 class="font-bold text-lg text-white truncate">${item.title}</h3>
+                        <p class="text-sm text-gray-300 mt-1 truncate">${subtitle}</p>
+                        ${episodeListButton}
+                    </div>
+                    <div class="absolute right-4 top-1/2 -translate-y-1/2 spinner hidden"></div>
+                </div>`;
+            continueWatchingContainer.classList.remove('hidden');
+        };
+
+        const renderWatchedHistoryList = () => {
+            const history = getWatchedHistory();
+            historyModalGrid.innerHTML = '';
+            if (history.length === 0) {
+                historyModalGrid.innerHTML = `<p class="text-gray-400 col-span-full text-center">Tu historial está vacío.</p>`;
+                return;
+            }
+            history.forEach(item => {
+                const card = renderCard(item, true);
+                card.classList.add('history-item-card');
+                historyModalGrid.appendChild(card);
+            });
+        };
+
+        const parseAndDisplayPagination = (paginationData, sourceUrl) => {
+            paginationControls.innerHTML = '';
+            if (!paginationData || lastMainView === 'favorites') return;
+            paginationData.forEach(item => {
+                const button = document.createElement('button');
+                button.className = 'px-4 py-2 text-sm font-medium rounded-md transition';
+                if (item.type === 'active') {
+                    button.className += ' bg-red-600 text-white cursor-default';
+                    button.textContent = item.text;
+                } else if (item.type === 'disabled') {
+                    button.className += ' bg-gray-700 text-gray-500 cursor-not-allowed';
+                    button.innerHTML = item.html; button.disabled = true;
+                } else if (item.type === 'link') {
+                    button.className += ' bg-gray-800 hover:bg-red-700';
+                    button.innerHTML = item.html;
+                    button.dataset.url = new URL(item.href, sourceUrl).href;
                 }
+                if (button.textContent || button.innerHTML.trim() !== '') paginationControls.appendChild(button);
+            });
+        };
+
+        const renderBanner = (items) => {
+            if (!items || items.length === 0) {
+                bannerContainer.classList.add('hidden');
+                return;
+            }
+            bannerSlider.innerHTML = items.map(item => `
+                <div class="banner-slide relative cursor-pointer" style="background-image: url('${item.imgSrc}')" data-url="${item.url}" data-title="${item.title}" data-img="${item.imgSrc}">
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-6">
+                        <h2 class="text-white text-2xl font-bold">${item.title}</h2>
+                    </div>
+                </div>
+            `).join('');
+            bannerTotalSlides = items.length;
+            bannerCurrentIndex = 0;
+            bannerContainer.classList.remove('hidden');
+            showBannerSlide(bannerCurrentIndex);
+            
+            clearInterval(bannerInterval);
+            bannerInterval = setInterval(() => {
+                bannerCurrentIndex = (bannerCurrentIndex + 1) % bannerTotalSlides;
+                showBannerSlide(bannerCurrentIndex);
+            }, 5000);
+        };
+
+        const showBannerSlide = (index) => {
+            bannerSlider.style.transform = `translateX(-${index * 100}%)`;
+        };
+        
+        const loadGalleryPage = async (url) => {
+            lastLoadedUrl = url;
+            paginationControls.style.display = 'flex';
+            const isBaseUrl = url === localStorage.getItem(SAVED_URL_KEY);
+
+            const cachedData = getCache(url);
+            if (cachedData) {
+                if (isBaseUrl) renderBanner(cachedData.items.slice(0, 5));
+                parseAndDisplayItems(cachedData.items);
+                parseAndDisplayPagination(cachedData.pagination, url);
+                return;
+            }
+
+            showStatusMessage('main', `<div class="spinner mx-auto" style="width: 3rem; height: 3rem; border-width: 4px;"></div>`, 'Obteniendo contenido...', `Extrayendo desde: ${url}`);
+            try {
+                const html = await fetchHtml(url);
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                const items = Array.from(doc.querySelectorAll('a.poster-card')).map(item => {
+                    const img = item.querySelector('img'), h3 = item.querySelector('h3');
+                    return img && h3 ? { url: item.href, title: h3.textContent.trim(), imgSrc: img.src } : null;
+                }).filter(Boolean);
+                const paginationEl = doc.querySelector('ul.pagination');
+                const pagination = paginationEl ? Array.from(paginationEl.querySelectorAll('li')).map(item => {
+                    if (item.classList.contains('active')) return { type: 'active', text: item.querySelector('span').textContent };
+                    if (item.classList.contains('disabled')) return { type: 'disabled', html: item.querySelector('span').innerHTML };
+                    const link = item.querySelector('a');
+                    if (link) return { type: 'link', html: link.innerHTML, href: link.getAttribute('href') };
+                    return null;
+                }).filter(Boolean) : null;
                 
-                if (!products[currentBarcode]) {
-                    const finalName = dom.manualProductName.value.trim() || currentProductInfo.name;
-                    if (!finalName) { alert("Ingresa el nombre del producto."); return; }
+                if (isBaseUrl) renderBanner(items.slice(0, 5));
 
-                    if (!currentProductInfo.category) {
-                        currentProductInfo.category = await getCategoryWithAI(finalName);
-                        if (currentProductInfo.category) dom.productCategory.textContent = currentProductInfo.category;
-                    }
+                setCache(url, { items, pagination });
+                parseAndDisplayItems(items);
+                parseAndDisplayPagination(pagination, url);
+            } catch (error) {
+                bannerContainer.classList.add('hidden');
+                const errorIcon = `<svg class="mx-auto h-12 w-12 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>`;
+                showStatusMessage('main', errorIcon, 'Error de Conexión', error.message, () => loadGalleryPage(url));
+            }
+        };
+
+        const renderDetailViewFromData = (data, url) => {
+             const watchedMainUrls = getWatchedHistory().map(h => h.url);
+               const watchedEpisodes = getWatchedEpisodes();
+               const isFavorited = !!getFavorites()[url];
+               const favButtonText = isFavorited ? 'Quitar de Favoritos' : 'Añadir a Favoritos';
+               const favButtonClass = isFavorited ? 'bg-gray-600 hover:bg-gray-700' : 'bg-red-600 hover:bg-red-700';
+               let actionButtonsHTML = `<button id="detail-fav-btn" data-url="${url}" data-title="${data.title}" data-img="${data.posterSrc}" class="${favButtonClass} flex items-center justify-center gap-2 w-full text-white font-bold py-3 px-6 rounded-lg transition">${favButtonText}</button>`;
+               
+               if (!data.isSeries) {
+                    const isWatched = watchedMainUrls.includes(url);
+                    actionButtonsHTML += `<button id="watch-now-btn" data-movie-url="${url}" data-img-src="${data.posterSrc}" class="watch-now-btn ${isWatched ? 'watched' : ''} flex items-center justify-center gap-2 w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg transition">
+                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                 <span>${isWatched ? 'Ver de Nuevo' : 'Ver Ahora'}</span><div class="spinner hidden ml-2"></div></button>`;
+               }
+
+               const heroHTML = `
+                    <div class="detail-hero" style="background-image: url('${data.posterSrc}')">
+                         <div class="relative z-10 p-6 md:p-10 flex flex-col md:flex-row items-center gap-6 md:gap-10">
+                              <img src="${data.posterSrc}" alt="Poster" class="w-48 md:w-64 h-auto object-cover rounded-lg shadow-2xl flex-shrink-0">
+                              <div class="flex-grow text-center md:text-left">
+                                   <h1 class="text-3xl lg:text-5xl font-bold text-white mb-4">${data.title}</h1>
+                                   <h3 class="text-lg font-semibold text-gray-300 mt-6 mb-2">Sinopsis</h3>
+                                   <p class="text-gray-400 text-base leading-relaxed max-w-2xl">${data.synopsis}</p>
+                                   <div class="mt-6 flex flex-col sm:flex-row gap-3 max-w-sm mx-auto md:mx-0">${actionButtonsHTML}</div>
+                              </div>
+                         </div>
+                    </div>`;
+
+               let contentHTML = heroHTML;
+
+               contentHTML += `
+                <div id="gemini-analysis-section" class="mt-8" data-title="${data.title}" data-synopsis="${data.synopsis}">
+                    <h2 class="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                         <svg class="w-6 h-6 text-yellow-400" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.25a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0V3a.75.75 0 0 1 .75-.75ZM7.5 12a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0Zm12.75 4.5a.75.75 0 0 0 0-1.5h-3.5a.75.75 0 0 0 0 1.5h3.5ZM12 7.5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0V8.25A.75.75 0 0 1 12 7.5ZM4.75 12a.75.75 0 0 0-1.5 0h-3.5a.75.75 0 0 0 0 1.5h3.5a.75.75 0 0 0 1.5 0Z" /></svg>
+                        Análisis con IA
+                    </h2>
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <button id="gemini-synopsis-btn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition flex items-center justify-center gap-2">
+                             ✨ Generar Sinopsis Mejorada
+                        </button>
+                        <button id="gemini-recommend-btn" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition flex items-center justify-center gap-2">
+                             ✨ Encontrar Títulos Similares
+                        </button>
+                    </div>
+                    <div id="gemini-result-area" class="mt-4 p-4 bg-gray-800 border border-gray-700 rounded-lg hidden">
+                        <div id="gemini-spinner" class="spinner mx-auto" style="width: 2rem; height: 2rem; border-width: 3px;"></div>
+                        <pre id="gemini-result-text" class="text-gray-300 whitespace-pre-wrap font-sans"></pre>
+                    </div>
+                </div>
+                `;
+
+               if (data.isSeries) {
+                    contentHTML += `<div class="bg-gray-800 rounded-lg p-4 md:p-6 border border-gray-700 mt-8">
+                         <div class="flex flex-wrap gap-2 mb-4 border-b border-gray-700 pb-4">${data.seasons.map((s, i) => `<button type="button" data-target="${s.id}" class="season-tab px-4 py-2 text-sm font-medium rounded-md bg-gray-700 hover:bg-red-700 transition ${i === 0 ? 'active' : ''}">${s.title}</button>`).join('')}</div>
+                         <div>${data.seasons.map((s, i) => `<div id="${s.id}" class="episode-pane grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 ${i === 0 ? 'active' : ''}">${s.episodes.map(ep => `<button type="button" data-episode-url="${ep.url}" data-img-src="${data.posterSrc}" class="episode-item ${watchedEpisodes[ep.url] ? 'watched' : ''} text-left p-3 bg-gray-900 hover:bg-gray-700 rounded-md transition border-l-4 border-transparent flex items-center justify-between"><span>${ep.title}</span><div class="spinner hidden ml-2"></div></button>`).join('')}</div>`).join('')}</div>
+                    </div>`;
+               }
+               
+               if (data.similarTitles && data.similarTitles.length > 0) {
+                    contentHTML += `<div class="mt-8">
+                         <h2 class="text-2xl font-bold text-white mb-4">Títulos Similares</h2>
+                         <div id="similar-titles-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6">
+                         </div>
+                    </div>`;
+               }
+               
+               detailContentArea.innerHTML = contentHTML;
+
+               if (data.similarTitles && data.similarTitles.length > 0) {
+                    const similarGrid = document.getElementById('similar-titles-grid');
+                    data.similarTitles.forEach(item => {
+                         const card = renderCard(item, watchedMainUrls.includes(item.url));
+                         similarGrid.appendChild(card);
+                    });
+               }
+        };
+
+        const loadAndShowDetailView = async (url, pushState = true) => {
+            if (pushState) history.pushState({ view: 'detail', url: url }, '');
+            showView('detail-view');
+            
+            const favorites = getFavorites();
+            if (favorites[url]?.hasNewEpisodes) {
+                delete favorites[url].hasNewEpisodes;
+            }
+
+            const cachedData = getCache(url);
+            if (cachedData) {
+                if(favorites[url] && cachedData.isSeries){
+                     favorites[url].lastEpisodeCount = cachedData.seasons.reduce((acc, season) => acc + season.episodes.length, 0);
+                     setLocalStorageData(FAVORITES_KEY, favorites);
+                }
+                renderDetailViewFromData(cachedData, url);
+                return;
+            }
+
+            showStatusMessage('detail', `<div class="spinner mx-auto" style="width: 3rem; height: 3rem; border-width: 4px;"></div>`, 'Cargando Detalles...', '');
+            try {
+                const html = await fetchHtml(url);
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                const detailsHeader = doc.querySelector('.details-header');
+                const seasonTabsContainer = doc.querySelector('#season-tabs');
+                
+                const similarHeading = Array.from(doc.querySelectorAll('h2, h3')).find(h => h.textContent.toLowerCase().includes('también te puede interesar'));
+                const similarGrid = similarHeading ? similarHeading.closest('.card, div').querySelector('.posters-grid') : null;
+                const similarTitles = similarGrid ? Array.from(similarGrid.querySelectorAll('a.poster-card')).map(item => {
+                    const img = item.querySelector('img');
+                    const title = item.querySelector('h3');
+                    return (img && title) ? { url: item.href, title: title.textContent.trim(), imgSrc: img.src } : null;
+                }).filter(Boolean) : [];
+
+                const detailData = {
+                    posterSrc: detailsHeader?.querySelector('.details-poster img')?.src || 'https://placehold.co/400x600/111827/d1d5db?text=No+Poster',
+                    title: detailsHeader?.querySelector('.details-info h1')?.textContent.trim() || 'Título no disponible',
+                    synopsis: Array.from(doc.querySelectorAll('h3')).find(h => h.textContent.includes('Sinopsis'))?.nextElementSibling?.textContent.trim() || 'Sinopsis no disponible.',
+                    isSeries: !!seasonTabsContainer,
+                    seasons: seasonTabsContainer ? Array.from(doc.querySelectorAll('#season-tabs li a')).map(tab => ({
+                        id: tab.dataset.tab,
+                        title: tab.textContent.trim(),
+                        episodes: Array.from(doc.querySelectorAll(`#${tab.dataset.tab} .episode-item`)).map(ep => ({
+                            title: ep.querySelector('.episode-title').textContent.trim(), url: ep.href
+                        }))
+                    })) : [],
+                    similarTitles: similarTitles
+                };
+                
+                if(favorites[url] && detailData.isSeries) {
+                     favorites[url].lastEpisodeCount = detailData.seasons.reduce((acc, season) => acc + season.episodes.length, 0);
+                     setLocalStorageData(FAVORITES_KEY, favorites);
+                }
+
+                setCache(url, detailData);
+                renderDetailViewFromData(detailData, url);
+            } catch (error) {
+                const errorIcon = `<svg class="mx-auto h-12 w-12 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>`;
+                showStatusMessage('detail', errorIcon, 'Error de Conexión', error.message, () => loadAndShowDetailView(url));
+            }
+        };
+
+        const openModalWithVideo = (iframeSrc, posterSrc, episodeData = null, pushState = true) => {
+            if(pushState) history.pushState({ view: 'modal' }, '');
+            
+            const showExternalBtn = getLocalStorageData(EXTERNAL_PLAYER_KEY, true);
+            const showEpisodeList = getLocalStorageData(EPISODE_LIST_IN_PLAYER_KEY, true);
+
+            modalOpenExternalBtn.style.display = showExternalBtn ? 'block' : 'none';
+            modalView.dataset.videoSrc = iframeSrc;
+
+            if (showEpisodeList && episodeData && episodeData.episodes.length > 0) {
+                modalEpisodeListContainer.classList.remove('hidden');
+                modalContent.classList.add('md:flex-row');
+                modalContent.classList.remove('max-w-4xl'); 
+                const watchedEpisodes = getWatchedEpisodes();
+                modalEpisodeList.innerHTML = episodeData.episodes.map(ep => `
+                    <button 
+                        type="button" 
+                        data-episode-url="${ep.url}" 
+                        class="modal-episode-item w-full text-left p-3 bg-gray-800 hover:bg-gray-700 rounded-md transition border-l-4 
+                        ${ep.url === episodeData.currentUrl ? 'active' : 'border-transparent'} 
+                        ${watchedEpisodes[ep.url] ? 'watched' : ''}">
+                        ${ep.title}
+                    </button>
+                `).join('');
+            } else {
+                modalEpisodeListContainer.classList.add('hidden');
+                modalContent.classList.remove('md:flex-row');
+                 modalContent.classList.add('max-w-4xl'); 
+            }
+            
+            modalIframeContainer.innerHTML = `<div id="video-placeholder" class="w-full h-full flex items-center justify-center" style="background-image: url('${posterSrc}')">
+                <div data-src="${iframeSrc}" class="w-full h-full flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                     <svg class="play-icon w-20 h-20 text-white opacity-80" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8.118v3.764a1 1 0 001.555.832l3.197-1.882a1 1 0 000-1.664l-3.197-1.882z" clip-rule="evenodd"></path></svg>
+                </div>
+            </div>`;
+            modalView.classList.remove('hidden'); 
+            modalView.classList.add('flex');
+        };
+
+        const closeModal = () => {
+            window.removeEventListener('beforeunload', handlePotentialRedirect);
+            modalIframeContainer.innerHTML = '';
+            modalView.dataset.videoSrc = '';
+            modalView.classList.add('hidden'); 
+            modalView.classList.remove('flex');
+            renderContinueWatching();
+        };
+
+        const closeHistoryModal = () => {
+            historyModalView.classList.add('hidden');
+            historyModalView.classList.remove('flex');
+        }
+
+        const fetchVideoSrc = async (pageUrl) => {
+             const html = await fetchHtml(pageUrl);
+             let videoSrc = null;
+             const scriptRegex = /var\s+videoSources\s*=\s*\[\s*'([^']+)'/;
+             const scriptMatch = html.match(scriptRegex);
+             if (scriptMatch && scriptMatch[1]) {
+                 videoSrc = scriptMatch[1];
+             } else {
+                 const doc = new DOMParser().parseFromString(html, 'text/html');
+                 const iframe = doc.querySelector('iframe[src*="/f/"], iframe[src*="/embed/"]');
+                 if (iframe && iframe.src) {
+                     videoSrc = iframe.src;
+                 } else {
+                     const urlRegex = /https?:\/\/[^/]+\/(?:f|embed|v|video)\/[a-zA-Z0-9_-]+/;
+                     const urlMatch = html.match(urlRegex);
+                     if (urlMatch && urlMatch[0]) videoSrc = urlMatch[0];
+                 }
+             }
+             if (videoSrc) return videoSrc;
+             throw new Error("No se pudo encontrar el video. El sitio puede haber cambiado su estructura.");
+        }
+        
+        const fetchAndShowVideo = async (videoPageUrl, clickedElement, episodeData) => {
+            if (!clickedElement || clickedElement.classList.contains('loading')) return;
+            
+            const posterSrc = clickedElement.dataset.imgSrc || modalView.dataset.posterSrc || 'https://placehold.co/1280x720/111827/d1d5db?text=Cargando...';
+            modalView.dataset.posterSrc = posterSrc;
+
+
+            clickedElement.classList.add('loading');
+            clickedElement.querySelector('.spinner')?.classList.remove('hidden');
+            try {
+                const videoSrc = await fetchVideoSrc(videoPageUrl);
+                openModalWithVideo(videoSrc, posterSrc, episodeData);
+            } catch (error) {
+                console.error("Error al cargar el video:", error);
+                alert(`${error.message}\n\nPor favor, intenta de nuevo.`);
+            } finally {
+                clickedElement.classList.remove('loading');
+                clickedElement.querySelector('.spinner')?.classList.add('hidden');
+            }
+        };
+        
+        const loadVideo = async (episodeUrl, clickedButton) => {
+            const detailFavBtn = document.getElementById('detail-fav-btn');
+            if (detailFavBtn) {
+                const isEpisode = clickedButton.matches('.episode-item');
+                const mainContentData = {
+                    url: detailFavBtn.dataset.url,
+                    title: detailFavBtn.dataset.title,
+                    imgSrc: detailFavBtn.dataset.img
+                };
+                
+                let continueData = { ...mainContentData, episodeUrl: episodeUrl };
+                let episodeData = null;
+                
+                if (isEpisode) {
+                    markEpisodeAsWatched(episodeUrl);
+                    const activeSeasonTab = document.querySelector('.season-tab.active');
+                    continueData.seasonName = activeSeasonTab ? activeSeasonTab.textContent.trim() : '';
+                    continueData.episodeTitle = clickedButton.querySelector('span')?.textContent.trim() || clickedButton.textContent.trim();
                     
-                    products[currentBarcode] = {
-                        name: finalName,
-                        imageUrl: currentProductInfo.imageUrl,
-                        category: currentProductInfo.category,
-                        entries: [],
+                    const episodePane = clickedButton.closest('.episode-pane');
+                    if (episodePane) {
+                        const episodes = Array.from(episodePane.querySelectorAll('.episode-item')).map(ep => ({
+                            title: ep.querySelector('span')?.textContent.trim() || ep.textContent.trim(),
+                            url: ep.dataset.episodeUrl
+                        }));
+                        episodeData = { episodes, currentUrl: episodeUrl };
+                    }
+                }
+
+                setContinueWatching(continueData);
+                markAsWatched(mainContentData);
+                await fetchAndShowVideo(episodeUrl, clickedButton, episodeData);
+            } else {
+                 await fetchAndShowVideo(episodeUrl, clickedButton, null);
+            }
+            clickedButton.classList.add('watched');
+            if (clickedButton.id === 'watch-now-btn') clickedButton.querySelector('span').textContent = 'Ver de Nuevo';
+            
+            const mainContentUrl = detailFavBtn?.dataset.url || episodeUrl;
+            const cardInGrid = resultsGrid.querySelector(`[data-url="${mainContentUrl}"]`);
+            if (cardInGrid) cardInGrid.classList.add('watched');
+        };
+
+        const switchVideoInModal = async (newUrl, clickedButtonElement) => {
+            modalIframeContainer.innerHTML = `<div class="w-full h-full flex items-center justify-center bg-black"><div class="spinner" style="width: 3rem; height: 3rem; border-width: 4px;"></div></div>`;
+            try {
+                const videoSrc = await fetchVideoSrc(newUrl);
+                
+                const isAdBlockEnabled = getLocalStorageData(AD_BLOCK_KEY, true);
+                const adblockAttributes = isAdBlockEnabled
+                    ? 'sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"'
+                    : 'allow="autoplay; fullscreen" allowfullscreen';
+                
+                modalIframeContainer.innerHTML = `<iframe src="${videoSrc}" class="w-full h-full" frameborder="0" ${adblockAttributes}></iframe>`;
+                modalView.dataset.videoSrc = videoSrc;
+
+                document.querySelectorAll('.modal-episode-item').forEach(btn => btn.classList.remove('active'));
+                clickedButtonElement.classList.add('active', 'watched');
+
+                const detailFavBtn = document.getElementById('detail-fav-btn');
+                if (detailFavBtn) {
+                     const mainContentData = {
+                        url: detailFavBtn.dataset.url,
+                        title: detailFavBtn.dataset.title,
+                        imgSrc: detailFavBtn.dataset.img
                     };
+                    const continueData = { 
+                        ...mainContentData, 
+                        episodeUrl: newUrl,
+                        episodeTitle: clickedButtonElement.textContent.trim(),
+                        seasonName: document.querySelector('.season-tab.active')?.textContent.trim() || ''
+                     };
+                     setContinueWatching(continueData);
+                     markEpisodeAsWatched(newUrl);
                 }
-
-                products[currentBarcode].entries.push({ price, quantity, unit, store });
-                
-                renderPriceComparison(currentBarcode);
-                renderSimilarProducts(products[currentBarcode].category, currentBarcode);
-                ['priceInput', 'quantityInput'].forEach(id => dom[id].value = '');
-                dom.formTitle.textContent = "¡Registro Guardado!";
-                saveData();
-            };
-
-            // --- SCANNER CONTROLS & INIT ---
-            const onScanSuccess = (decodedText) => { if (isScanning) handleScannedBarcode(decodedText); };
-            const startScanning = () => {
-                showView('scanner');
-                const config = { fps: 10, qrbox: { width: 250, height: 150 }, rememberLastUsedCamera: true };
-                html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
-                    .then(() => { isScanning = true; dom.reader.classList.add('scanning'); })
-                    .catch(err => console.error("Camera start error:", err));
-            };
-            const stopScanning = () => {
-                if (isScanning && html5QrCode.isScanning) {
-                    html5QrCode.stop().then(() => { isScanning = false; dom.reader.classList.remove('scanning'); }).catch(err => {});
-                }
-            };
-            const init = () => {
-                loadData();
-                updateStoreSelect();
-                
-                dom.addStoreButton.addEventListener('click', addStore);
-                dom.savePriceButton.addEventListener('click', savePrice);
-                dom.rescanButton.addEventListener('click', startScanning);
-                dom.suggestNameButton.addEventListener('click', () => suggestNameWithAI(currentBarcode));
-                dom.editImageButton.addEventListener('click', () => dom.imageEditOptions.classList.toggle('hidden'));
-                dom.uploadImageButton.addEventListener('click', () => dom.imageFileInput.click());
-                dom.imageFileInput.addEventListener('change', handleImageFileUpload);
-                dom.imageUrlInput.addEventListener('change', (e) => { const url = e.target.value.trim(); if(url) updateProductImage(currentBarcode, url); });
-
-                html5QrCode = new Html5Qrcode("reader");
-                startScanning();
-            };
-
-            init();
+            } catch (error) {
+                 modalIframeContainer.innerHTML = `<div class="w-full h-full flex items-center justify-center bg-black text-red-500 p-4">Error al cargar el video.</div>`;
+                 console.error(error);
+            }
+        };
+        
+        // --- Event Listeners ---
+        window.addEventListener('scroll', () => {
+            if (!mainView.classList.contains('active')) return;
+            
+            let scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            
+            if (scrollTop > lastScrollTop && scrollTop > header.offsetHeight) {
+                header.classList.add('header-hidden');
+            } else {
+                header.classList.remove('header-hidden');
+            }
+            lastScrollTop = scrollTop <= 0 ? 0 : scrollTop;
         });
+
+        document.body.addEventListener('click', async (e) => {
+            const bannerSlide = e.target.closest('.banner-slide');
+            if(bannerSlide) {
+                loadAndShowDetailView(bannerSlide.dataset.url);
+                return;
+            }
+
+            const videoPlaceholder = e.target.closest('#video-placeholder div');
+            if (videoPlaceholder) {
+                const iframeSrc = videoPlaceholder.dataset.src;
+                if (iframeSrc) {
+                    const isAdBlockEnabled = getLocalStorageData(AD_BLOCK_KEY, true);
+                    const adblockAttributes = isAdBlockEnabled
+                        ? 'sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"'
+                        : 'allow="autoplay; fullscreen" allowfullscreen';
+                    
+                    modalIframeContainer.innerHTML = `<iframe src="${iframeSrc}" class="w-full h-full" frameborder="0" ${adblockAttributes}></iframe>`;
+                    
+                    if (!isAdBlockEnabled) {
+                        window.addEventListener('beforeunload', handlePotentialRedirect);
+                    }
+                }
+                return;
+            }
+
+            const modalEpisodeItem = e.target.closest('.modal-episode-item');
+            if (modalEpisodeItem && !modalEpisodeItem.classList.contains('active')) {
+                const newUrl = modalEpisodeItem.dataset.episodeUrl;
+                switchVideoInModal(newUrl, modalEpisodeItem);
+                return;
+            }
+
+            const viewHistoryBtn = e.target.closest('#view-history-btn');
+            if(viewHistoryBtn){
+                history.pushState({ view: 'history' }, '');
+                renderWatchedHistoryList();
+                historyModalView.classList.remove('hidden');
+                historyModalView.classList.add('flex');
+                return;
+            }
+
+            const historyItemCard = e.target.closest('.history-item-card');
+            if(historyItemCard){
+                closeHistoryModal();
+                loadAndShowDetailView(historyItemCard.dataset.url);
+                return;
+            }
+
+            const viewEpisodesBtn = e.target.closest('.view-episodes-btn');
+            if (viewEpisodesBtn) {
+                e.stopPropagation();
+                if (historyModalView.classList.contains('flex')) {
+                    closeHistoryModal();
+                }
+                loadAndShowDetailView(viewEpisodesBtn.dataset.seriesUrl);
+                return;
+            }
+
+            const continueWatchingCard = e.target.closest('#continue-watching-card');
+            if (continueWatchingCard) {
+                await loadVideo(continueWatchingCard.dataset.episodeUrl, continueWatchingCard);
+                return;
+            }
+            const card = e.target.closest('.poster-card');
+            if (card) {
+                loadAndShowDetailView(card.dataset.url);
+                return;
+            }
+            
+            const favBtn = e.target.closest('.fav-btn');
+            if (favBtn) {
+                e.stopPropagation();
+                const parentCard = favBtn.closest('.poster-card');
+                const isFavorited = toggleFavorite(parentCard.dataset.url, parentCard.dataset.title, parentCard.dataset.img);
+                favBtn.classList.toggle('favorited', isFavorited);
+                if (lastMainView === 'favorites' && !isFavorited) parentCard.remove();
+                return;
+            }
+            const detailFavBtn = e.target.closest('#detail-fav-btn');
+            if(detailFavBtn) {
+                const isFavorited = toggleFavorite(detailFavBtn.dataset.url, detailFavBtn.dataset.title, detailFavBtn.dataset.img);
+                detailFavBtn.textContent = isFavorited ? 'Quitar de Favoritos' : 'Añadir a Favoritos';
+                detailFavBtn.classList.toggle('bg-gray-600', isFavorited); detailFavBtn.classList.toggle('hover:bg-gray-700', isFavorited);
+                detailFavBtn.classList.toggle('bg-red-600', !isFavorited); detailFavBtn.classList.toggle('hover:bg-red-700', !isFavorited);
+                return;
+            }
+            const seasonTab = e.target.closest('.season-tab');
+            if (seasonTab) {
+                document.querySelectorAll('.season-tab').forEach(t => t.classList.remove('active'));
+                seasonTab.classList.add('active');
+                document.querySelectorAll('.episode-pane').forEach(p => p.classList.remove('active'));
+                document.getElementById(seasonTab.dataset.target).classList.add('active');
+                return;
+            }
+            const episodeItem = e.target.closest('.episode-item');
+            if (episodeItem?.dataset.episodeUrl) return loadVideo(episodeItem.dataset.episodeUrl, episodeItem);
+            
+            const watchNowBtn = e.target.closest('#watch-now-btn');
+            if (watchNowBtn?.dataset.movieUrl) return loadVideo(watchNowBtn.dataset.movieUrl, watchNowBtn);
+            
+            const paginationButton = e.target.closest('#pagination-controls button');
+            if (paginationButton?.dataset.url) return loadGalleryPage(paginationButton.dataset.url);
+            
+            const geminiSynopsisBtn = e.target.closest('#gemini-synopsis-btn');
+            if (geminiSynopsisBtn) {
+                const analysisSection = geminiSynopsisBtn.closest('#gemini-analysis-section');
+                const title = analysisSection.dataset.title;
+                const synopsis = analysisSection.dataset.synopsis;
+                const resultArea = document.getElementById('gemini-result-area');
+                const resultText = document.getElementById('gemini-result-text');
+                const spinner = document.getElementById('gemini-spinner');
+
+                resultArea.classList.remove('hidden');
+                spinner.classList.remove('hidden');
+                resultText.textContent = '';
+                
+                const prompt = `Eres un experto en cine y series. El título es "${title}". La sinopsis actual es: "${synopsis}". 
+                Genera una sinopsis mejorada, atractiva y detallada en español. No incluyas el título en tu respuesta, solo el texto de la sinopsis.`;
+                
+                try {
+                    const geminiResponse = await callGeminiAPI(prompt);
+                    resultText.textContent = geminiResponse;
+                } catch (error) {
+                    resultText.textContent = `Error al contactar la IA: ${error.message}`;
+                } finally {
+                    spinner.classList.add('hidden');
+                }
+                return;
+            }
+
+            const geminiRecommendBtn = e.target.closest('#gemini-recommend-btn');
+            if (geminiRecommendBtn) {
+                const analysisSection = geminiRecommendBtn.closest('#gemini-analysis-section');
+                const title = analysisSection.dataset.title;
+                const synopsis = analysisSection.dataset.synopsis;
+                const resultArea = document.getElementById('gemini-result-area');
+                const resultText = document.getElementById('gemini-result-text');
+                const spinner = document.getElementById('gemini-spinner');
+
+                resultArea.classList.remove('hidden');
+                spinner.classList.remove('hidden');
+                resultText.textContent = '';
+                
+                const prompt = `Eres un experto recomendador de cine y series. Basado en el título "${title}" y la sinopsis "${synopsis}", recomiéndame 5 películas o series similares. 
+                Para cada recomendación, proporciona el título y una breve explicación (1-2 frases) de por qué es similar. 
+                Formatea tu respuesta en español como una lista numerada.`;
+                
+                try {
+                    const geminiResponse = await callGeminiAPI(prompt);
+                    resultText.textContent = geminiResponse;
+                } catch (error) {
+                    resultText.textContent = `Error al contactar la IA: ${error.message}`;
+                } finally {
+                    spinner.classList.add('hidden');
+                }
+                return;
+            }
+        });
+        
+        configBtn.addEventListener('click', () => {
+            history.pushState({ view: 'config' }, '');
+            showView('config-view');
+        });
+        backToMainBtn.addEventListener('click', () => history.back());
+        detailBackBtn.addEventListener('click', () => history.back());
+        modalCloseBtn.addEventListener('click', () => history.back());
+        historyModalCloseBtn.addEventListener('click', () => history.back());
+        
+        modalOpenExternalBtn.addEventListener('click', () => {
+            const videoSrc = modalView.dataset.videoSrc;
+            if (videoSrc) {
+                window.open(videoSrc, '_blank');
+                history.back();
+            }
+        });
+        modalView.addEventListener('click', (e) => { if (e.target === modalView) history.back(); });
+        historyModalView.addEventListener('click', (e) => { if (e.target === historyModalView) history.back(); });
+        
+        modalFullscreenBtn.addEventListener('click', () => {
+            const iframe = modalIframeContainer.querySelector('iframe');
+            if (!iframe) return;
+            if (iframe.requestFullscreen) iframe.requestFullscreen();
+            else if (iframe.webkitRequestFullscreen) iframe.webkitRequestFullscreen();
+            else if (iframe.msRequestFullscreen) iframe.msRequestFullscreen();
+        });
+
+        saveBtn.addEventListener('click', async () => {
+            const url = urlInput.value.trim();
+            if (!url) return;
+            localStorage.setItem(SAVED_URL_KEY, url);
+            history.back();
+            mainTitle.textContent = "Contenido Reciente";
+            recentlyAddedBtn.classList.add('active');
+            favoritesFilterBtn.classList.remove('active');
+            await loadGalleryPage(url);
+        });
+
+        searchForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const query = searchInput.value.trim();
+            if (!query) return;
+
+            lastMainView = 'search';
+            recentlyAddedBtn.classList.remove('active');
+            favoritesFilterBtn.classList.remove('active');
+            bannerContainer.classList.add('hidden');
+            
+            const searchUrl = `https://serieskao.top/search?s=${encodeURIComponent(query)}`;
+            mainTitle.textContent = "Resultados de Búsqueda";
+            loadGalleryPage(searchUrl);
+        });
+        
+        favoritesFilterBtn.addEventListener('click', () => {
+             displayFavorites();
+        });
+
+        recentlyAddedBtn.addEventListener('click', () => {
+            lastMainView = 'recent';
+            favoritesFilterBtn.classList.remove('active');
+            recentlyAddedBtn.classList.add('active');
+            mainTitle.textContent = "Contenido Reciente";
+            bannerContainer.classList.remove('hidden');
+            const savedUrl = localStorage.getItem(SAVED_URL_KEY);
+            if (savedUrl) {
+                loadGalleryPage(savedUrl);
+            }
+        });
+
+        clearCacheBtn.addEventListener('click', clearAllCache);
+
+        hideRedirectAlertCheckbox.addEventListener('change', () => {
+            setLocalStorageData(HIDE_REDIRECT_ALERT_KEY, hideRedirectAlertCheckbox.checked);
+        });
+
+        adblockCheckbox.addEventListener('change', () => {
+            setLocalStorageData(AD_BLOCK_KEY, adblockCheckbox.checked);
+        });
+
+        externalPlayerCheckbox.addEventListener('change', () => {
+            setLocalStorageData(EXTERNAL_PLAYER_KEY, externalPlayerCheckbox.checked);
+        });
+        
+        episodeListPlayerCheckbox.addEventListener('change', () => {
+            setLocalStorageData(EPISODE_LIST_IN_PLAYER_KEY, episodeListPlayerCheckbox.checked);
+        });
+        
+        bannerNextBtn.addEventListener('click', () => {
+            bannerCurrentIndex = (bannerCurrentIndex + 1) % bannerTotalSlides;
+            showBannerSlide(bannerCurrentIndex);
+        });
+
+        bannerPrevBtn.addEventListener('click', () => {
+            bannerCurrentIndex = (bannerCurrentIndex - 1 + bannerTotalSlides) % bannerTotalSlides;
+            showBannerSlide(bannerCurrentIndex);
+        });
+
+        const checkFavoritesForUpdates = async (isSilent = false) => {
+            if (!isSilent) {
+                checkUpdatesBtn.disabled = true;
+                checkUpdatesBtn.innerHTML = `<div class="spinner"></div>`;
+            }
+
+            const favorites = getFavorites();
+            const favoriteEntries = Object.entries(favorites);
+            let updatedCount = 0;
+            let seriesInFavorites = 0;
+
+            const checkPromises = favoriteEntries.map(async ([url, favData]) => {
+                try {
+                    const html = await fetchHtml(url);
+                    const doc = new DOMParser().parseFromString(html, 'text/html');
+                    if (!doc.querySelector('#season-tabs')) return;
+
+                    seriesInFavorites++;
+                    const currentEpisodeCount = doc.querySelectorAll('.episode-item').length;
+
+                    if (favData.lastEpisodeCount === undefined) {
+                        favorites[url].lastEpisodeCount = currentEpisodeCount;
+                    } else if (currentEpisodeCount > favData.lastEpisodeCount) {
+                        updatedCount++;
+                        favorites[url].hasNewEpisodes = true;
+                    }
+                } catch (error) {
+                    console.error(`Fallo al revisar ${url}:`, error);
+                }
+            });
+
+            await Promise.all(checkPromises);
+            setLocalStorageData(FAVORITES_KEY, favorites);
+
+            const updatedFavorites = getFavorites();
+            document.querySelectorAll('.poster-card').forEach(card => {
+                const url = card.dataset.url;
+                if (updatedFavorites[url]?.hasNewEpisodes) {
+                    card.classList.add('has-new');
+                } else {
+                    card.classList.remove('has-new');
+                }
+            });
+
+            if (!isSilent) {
+                checkUpdatesBtn.disabled = false;
+                checkUpdatesBtn.innerHTML = checkUpdatesBtnIcon;
+                if (seriesInFavorites === 0) {
+                    alert('No tienes series en favoritos para revisar.');
+                } else if (updatedCount > 0) {
+                    alert(`${updatedCount} de tus series favoritas tienen contenido nuevo.`);
+                } else {
+                    alert('Todo al día. Ninguna de tus series favoritas tiene capítulos nuevos.');
+                }
+            }
+        };
+
+        checkUpdatesBtn.addEventListener('click', () => checkFavoritesForUpdates(false));
+        
+        window.addEventListener('popstate', (e) => {
+            const state = e.state || { view: 'main' };
+            
+            closeModal();
+            closeHistoryModal();
+
+            if (state.view === 'detail') {
+                loadAndShowDetailView(state.url, false);
+            } else if (state.view === 'config') {
+                showView('config-view');
+            } else {
+                 showView('main-view');
+                 if(lastMainView === 'favorites') displayFavorites();
+            }
+        });
+
+        // --- Initialization ---
+        const init = () => {
+            history.replaceState({ view: 'main' }, '');
+            hideRedirectAlertCheckbox.checked = getLocalStorageData(HIDE_REDIRECT_ALERT_KEY, false);
+            adblockCheckbox.checked = getLocalStorageData(AD_BLOCK_KEY, true); 
+            externalPlayerCheckbox.checked = getLocalStorageData(EXTERNAL_PLAYER_KEY, true); 
+            episodeListPlayerCheckbox.checked = getLocalStorageData(EPISODE_LIST_IN_PLAYER_KEY, true);
+            
+            let savedUrl = localStorage.getItem(SAVED_URL_KEY);
+            if (!savedUrl) {
+                savedUrl = 'https://serieskao.top/year/2025/';
+                localStorage.setItem(SAVED_URL_KEY, savedUrl);
+            }
+
+            urlInput.value = savedUrl;
+            mainTitle.textContent = "Contenido Reciente";
+            recentlyAddedBtn.classList.add('active');
+            lastMainView = 'recent';
+            loadGalleryPage(savedUrl);
+            setTimeout(() => checkFavoritesForUpdates(true), 2000);
+            
+            renderContinueWatching();
+            showView('main-view');
+        };
+
+        init();
+    });
     </script>
 </body>
 </html>
