@@ -275,7 +275,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
-        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, writeBatch, where, getDocs, Timestamp, getDoc } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
         
         const firebaseConfig = {
@@ -369,12 +369,22 @@
         // --- AUTENTICACIÓN ---
         const provider = new GoogleAuthProvider();
 
-        const signInWithGoogle = () => {
-            signInWithPopup(auth, provider).catch(error => console.error("Error al iniciar sesión con Google:", error));
+        const signInWithGoogle = () => signInWithPopup(auth, provider).catch(error => console.error("Error al iniciar sesión con Google:", error));
+        const signOutUser = () => signOut(auth).catch(error => console.error("Error al cerrar sesión:", error));
+        
+        window.signInFromNative = (token) => {
+            signInWithCustomToken(auth, token)
+                .catch(error => console.error("Error signing in with custom token:", error));
         };
 
-        const signOutUser = () => {
-            signOut(auth).catch(error => console.error("Error al cerrar sesión:", error));
+        const requestGoogleSignIn = () => {
+            if (window.Android && typeof window.Android.requestGoogleSignIn === 'function') {
+                window.Android.requestGoogleSignIn();
+            } else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.requestGoogleSignIn) {
+                window.webkit.messageHandlers.requestGoogleSignIn.postMessage({});
+            } else {
+                signInWithGoogle();
+            }
         };
 
         onAuthStateChanged(auth, (user) => {
@@ -942,7 +952,7 @@
         }
         
         // --- EVENT LISTENERS ---
-        googleLoginBtn.addEventListener('click', signInWithGoogle);
+        googleLoginBtn.addEventListener('click', requestGoogleSignIn);
         signOutBtn.addEventListener('click', signOutUser);
         addTransactionBtn.addEventListener('click', () => setupTransactionModal('add'));
         addAccountBtn.addEventListener('click', () => setupAccountModal('add'));
@@ -1155,3 +1165,4 @@
     </script>
 </body>
 </html>
+
